@@ -74,7 +74,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<List<Asteroid>> loadAsteroidData() async {
-    final rawData = await rootBundle.loadString('assets/astroidReadTest.csv');
+    final rawData = await rootBundle.loadString('lib/assets/astroidReadTest.csv');
     final csvData = const CsvToListConverter(eol: '\n').convert(rawData);
     final rows = csvData.sublist(1); // Skip header
 

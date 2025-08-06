@@ -48,6 +48,7 @@ flutter:
     - lib/assets/spacekit_page.html
     - lib/assets/astroidReadTest.csv
     - lib/assets/latest_fulldb.csv
+    - lib/assets/images/orbit_placeholder.png
     - .env
 
 

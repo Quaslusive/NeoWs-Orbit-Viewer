@@ -1,7 +1,6 @@
-
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../model/asteroid.dart';
+import 'package:neows_app/model/asteroid_csv.dart';
 
 class OrbitPlotPage extends StatelessWidget {
   final List<Asteroid> asteroids;
@@ -17,18 +16,35 @@ class OrbitPlotPage extends StatelessWidget {
         child: ScatterChart(
           ScatterChartData(
             scatterSpots: asteroids.map((a) {
-              return ScatterSpot(a.a, a.e, color: Colors.blue, radius: 6);
+              return ScatterSpot(
+                a.a,
+                a.e,
+                dotPainter: FlDotCirclePainter(
+                  color: Colors.blue,
+                  radius: 6,
+                ),
+              );
+
             }).toList(),
             gridData: FlGridData(show: true),
             borderData: FlBorderData(show: true),
             titlesData: FlTitlesData(
               bottomTitles: AxisTitles(
-                sideTitles: SideTitles(showTitles: true, reservedSize: 30),
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 30,
+                  getTitlesWidget: (value, meta) => Text(value.toStringAsFixed(1)),
+                ),
               ),
               leftTitles: AxisTitles(
-                sideTitles: SideTitles(showTitles: true, reservedSize: 30),
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 30,
+                  getTitlesWidget: (value, meta) => Text(value.toStringAsFixed(1)),
+                ),
               ),
             ),
+
           ),
         ),
       ),
