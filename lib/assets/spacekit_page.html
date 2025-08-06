@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Spacekit Orbit v2</title>
+    <script src="https://unpkg.com/spacekit/build/spacekit.js"></script> <!-- still allowed -->
+<!--
+    <script src="https://typpo.github.io/spacekit/build/spacekit.js"></script> &lt;!&ndash; still allowed &ndash;&gt;
+-->
+    <style>
+        html, body, #space {
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          height: 100%;
+          background-color: black;
+        }
+    </style>
+</head>
+<body>
+<div id="space"></div>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const spacekit = new Spacekit.SpaceKit({
+        scene: {
+          target: 'space',
+          basePath: '/',
+        },
+      });
+
+      spacekit.createStar({ name: 'Sun' });
+
+      spacekit.createObject('Earth', {
+        ephem: Spacekit.EphemPresets.earth,
+      });
+
+      window.loadOrbitFromFlutter = function(name) {
+        console.log("Loading orbit:", name);
+        spacekit.createObject(name, {
+          ephem: Spacekit.EphemPresets[name.toLowerCase()],
+        });
+      };
+    });
+</script>
+</body>
+</html>
