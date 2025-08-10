@@ -31,14 +31,4 @@ class Asteroid {
     required this.e,
   });
 
-  String dangerLevel() {
-    if (pha == 'Y' && moid < 0.05 && diameter > 140) {
-      return 'Extreme Danger 🔥🔥🔥';
-    } else if (pha == 'Y' || moid < 0.1) {
-      return 'Moderate Risk ⚠️';
-    } else {
-      return 'Safe ✅';
-    }
-  }
-
 }
