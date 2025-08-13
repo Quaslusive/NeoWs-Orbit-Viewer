@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:neows_app/model/asteroid_csv.dart';
-
-import 'package:neows_app/pages/asteroid_danger_page.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:csv/csv.dart';
-import 'package:neows_app/pages/orbit_plot_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -73,6 +70,13 @@ class HomePage extends StatelessWidget {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, "/orbit_page");
               },
+            ),  ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text("Settings"),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, "/orbit_page");
+              },
             ),
           ],
         ),
@@ -83,6 +87,7 @@ class HomePage extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: SvgPicture.asset(
             'lib/assets/images/NASA_Worm_logo.svg',
+         //   'lib/assets/images/icon/icon1.png',
             width: 200,
             height: 200,
           ),
@@ -99,13 +104,6 @@ class HomePage extends StatelessWidget {
           child: const Text("Gå till Orbit sidan"),
           onPressed: () {
             Navigator.pushNamed(context, "/orbit_page");
-          },
-        ),
-        const SizedBox(height: 20),
-        ElevatedButton(
-          child: const Text("Gå till Orbit webviewer"),
-          onPressed: () {
-            Navigator.pushNamed(context, "/orbits_webview");
           },
         ),
         const SizedBox(height: 20),
@@ -129,33 +127,6 @@ class HomePage extends StatelessWidget {
             Navigator.pushNamed(context, "/asteroid_search");
           },
         ),
-        const SizedBox(height: 20),
-        ElevatedButton(
-          child: const Text("Visa NEO Danger Meter"),
-          onPressed: () async {
-            final asteroids = await loadAsteroidsFromCsv();
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => AsteroidDangerPage(asteroids: asteroids),
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 20),
-        ElevatedButton(
-          child: const Text("Visa Orbit Visualisering"),
-          onPressed: () async {
-            final asteroids = await loadAsteroidsFromCsv();
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => OrbitPlotPage(asteroids: asteroids),
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 20),
       ],
     ),
     );

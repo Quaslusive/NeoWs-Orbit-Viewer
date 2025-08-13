@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:neows_app/model/asteroid_nasa_lookup.dart';
-import 'package:neows_app/nasa_api_service.dart';
+import 'package:neows_app/service//nasa_api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AsteroidPage extends StatefulWidget {

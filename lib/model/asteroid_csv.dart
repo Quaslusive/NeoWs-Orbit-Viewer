@@ -1,3 +1,5 @@
+import 'package:neows_app/service/asterank_api_service.dart';
+
 class Asteroid {
   final String id;
   final String name;
@@ -13,6 +15,23 @@ class Asteroid {
 // test chart
   final double a;
   final double e;
+
+  // Asterank-enriched fields (all optional)
+  double? asterankPriceUsd;
+  double? asterankAlbedo;
+  double? asterankDiameterKm;
+  double? asterankDensity;
+  String? asterankSpec;
+  String? asterankFullName;
+
+  void applyAsterank(AsterankInfo info) {
+    asterankPriceUsd   = info.price ?? asterankPriceUsd;
+    asterankAlbedo     = info.pv ?? asterankAlbedo;
+    asterankDiameterKm = info.diameter ?? asterankDiameterKm;
+    asterankDensity    = info.density ?? asterankDensity;
+    asterankSpec       = info.spec ?? asterankSpec;
+    asterankFullName   = info.fullName ?? asterankFullName;
+  }
 
   Asteroid({
     required this.id,
