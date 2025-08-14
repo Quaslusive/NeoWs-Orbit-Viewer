@@ -1,3 +1,4 @@
+/*
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/foundation.dart' show compute;
 import 'package:csv/csv.dart';
@@ -45,3 +46,4 @@ Future<void> importCsvIfEmpty(AppDb db, {String assetPath = 'lib/assets/astroidR
     await db.insertMany(buffer);
   }
 }
+*/

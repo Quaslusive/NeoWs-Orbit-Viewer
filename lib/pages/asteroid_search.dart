@@ -1,13 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:neows_app/db/app_db.dart';
-import 'package:neows_app/db/csv_import.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:csv/csv.dart';
+import 'package:flutter/foundation.dart' show compute;
 
 import 'package:neows_app/model/asteroid_csv.dart';
 import 'package:neows_app/pages/asteroid_details_page.dart';
 import 'package:neows_app/widget/asteroid_card.dart';
 import 'package:neows_app/service/asterank_api_service.dart';
 
+// -------- CSV parsing on a background isolate --------
+List<List<dynamic>> _parseCsv(String raw) {
+  return const CsvToListConverter(eol: '\n').convert(raw);
+}
 
 class AsteroidSearchPage extends StatefulWidget {
   const AsteroidSearchPage({super.key});
@@ -20,42 +25,96 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
   final AsterankApiService _asterank = AsterankApiService();
   final Set<String> _enriching = {};
 
+  // Data in memory
   List<Asteroid> _asteroids = [];
   List<Asteroid> _filtered = [];
 
-  // Online/Offline + limits
-  bool _onlineMode = true; // Online by default
-  int _asterankLimit = 50; // how many to enrich
-  int _csvLimit = 50; // how many CSV rows to load
+  // Modes & limits
+  bool _onlineMode = true;   // API enrichment only when true
+  int _csvLimit = 50;        // how many rows to load from CSV
+  int _asterankLimit = 50;   // how many results to enrich with Asterank
 
-  late final AppDb _db;
-  int _offset = 0;
-  late int _pageSize = 50;
-  List<Asteroid> _items = [];
-  bool _loadingPage = false;
-  String _query = '';
-
-  // Paging for UI
+  // Paging the visible list
   int _visibleCount = 50;
+  int _pageSize = 50;
 
-  // Search debounce (optional but nice)
+  // Search debounce
   Timer? _debounce;
   String _search = '';
 
-  bool _hasAnyAsterank(Asteroid a) =>
-      a.asterankPriceUsd != null ||
-      a.asterankAlbedo != null ||
-      a.asterankDiameterKm != null ||
-      a.asterankDensity != null ||
-      (a.asterankSpec?.isNotEmpty == true);
-
+  // ---------- lifecycle ----------
   @override
   void initState() {
     super.initState();
-    _db = AppDb();
-    _initDb();
+    _loadCsv(); // initial CSV load
   }
 
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  // ---------- helpers ----------
+  bool _hasAnyAsterank(Asteroid a) =>
+      a.asterankPriceUsd != null ||
+          a.asterankAlbedo != null ||
+          a.asterankDiameterKm != null ||
+          a.asterankDensity != null ||
+          (a.asterankSpec?.isNotEmpty == true);
+
+  // Danger label
+  String getDangerLevel(Asteroid a) {
+    final isPha = a.pha.toUpperCase() == 'Y';
+    final moidRisk = a.moid < 0.05;         // au
+    final bigEnough = a.diameter >= 0.14;   // km (~140m)
+    if ((isPha || moidRisk) && bigEnough) return 'Extreme Danger 🔥🔥🔥';
+    if (isPha || moidRisk) return 'Moderate Risk ⚠️';
+    return 'Safe ✅';
+  }
+
+  // ---------- CSV loading ----------
+  Future<void> _loadCsv() async {
+    // Pick the asset you actually want to ship:
+    // final raw = await rootBundle.loadString('lib/assets/latest_fulldb.csv');
+    final raw = await rootBundle.loadString('lib/assets/astroidReadTest.csv');
+
+    final csv = await compute(_parseCsv, raw);
+
+    final list = <Asteroid>[];
+    // Skip header at index 0. Respect _csvLimit.
+    for (int i = 1; i < csv.length && i <= _csvLimit; i++) {
+      final row = csv[i];
+      list.add(
+        Asteroid(
+          id: (row[0] ?? '').toString(),
+          name: (row[4] ?? '').toString(),
+          fullName: (row[2] ?? '').toString(),
+          diameter: double.tryParse(row[15].toString()) ?? 0.0,  // km
+          albedo: double.tryParse(row[17].toString()) ?? 0.0,
+          neo: (row[6] ?? '').toString(),
+          pha: (row[7] ?? '').toString(),
+          rotationPeriod: double.tryParse(row[18].toString()) ?? 0.0,
+          classType: (row[60] ?? '').toString(),
+          orbitId: int.tryParse(row[27].toString()) ?? 0,
+          moid: double.tryParse(row[45].toString()) ?? 0.0,      // au
+          a: double.tryParse(row[33].toString()) ?? 0.0,
+          e: double.tryParse(row[32].toString()) ?? 0.0,
+        ),
+      );
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _asteroids = list;
+      _filtered = list;
+      _visibleCount = _pageSize.clamp(0, _filtered.length);
+    });
+
+    if (_onlineMode) _enrichBatch(_filtered);
+  }
+
+  // ---------- Enrichment (Asterank) ----------
   Future<void> _enrichBatch(List<Asteroid> items) async {
     if (!_onlineMode) return;
     final batch = items.take(_asterankLimit).toList();
@@ -77,162 +136,145 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
 
       final info = await _asterank.fetchByDesignation(key);
       if (!mounted || info == null) return;
-      setState(() => a.applyAsterank(info));
+
+      setState(() {
+        a.applyAsterank(info);
+      });
     } finally {
       if (mounted) setState(() => _enriching.remove(a.id));
     }
   }
 
-  Future<void> _initDb() async {
-    await importCsvIfEmpty(_db); // one-time import
-    await _loadFirstPage(); // initial page
-  }
-
-  Future<void> _loadFirstPage() async {
-    _offset = 0;
-    _items =
-        await _db.searchPaged(limit: _pageSize, offset: _offset, query: _query);
-    setState(() {});
-    if (_onlineMode) _enrichBatch(_items);
-  }
-
-  Future<void> _loadNextPage() async {
-    if (_loadingPage) return;
-    _loadingPage = true;
-    _offset += _pageSize;
-    final next =
-        await _db.searchPaged(limit: _pageSize, offset: _offset, query: _query);
-    _items.addAll(next);
-    _loadingPage = false;
-    setState(() {});
-    if (_onlineMode) _enrichBatch(next);
-  }
-
+  // ---------- Search ----------
   void _onSearchChanged(String q) {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 250), () {
-      _query = q.trim();
-      _loadFirstPage(); // resets paging and re-queries DB
-    });
-  }
-
-  void _filterAsteroids(String query) {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 250), () {
       setState(() {
-        _search = query;
-        final q = query.toLowerCase();
+        _search = q;
+        final needle = q.toLowerCase();
         _filtered = _asteroids.where((a) {
           final n = (a.name ?? '').toLowerCase();
           final fn = (a.fullName ?? '').toLowerCase();
-          return n.contains(q) || fn.contains(q);
+          return n.contains(needle) || fn.contains(needle);
         }).toList();
-        _visibleCount = _pageSize; // reset paging for new results
+        _visibleCount = _pageSize.clamp(0, _filtered.length);
       });
       if (_onlineMode) _enrichBatch(_filtered);
     });
   }
 
-  // PHA heuristic
-  String getDangerLevel(Asteroid a) {
-    final isPha = a.pha.toUpperCase() == 'Y';
-    final moidRisk = a.moid < 0.05;
-    final bigEnough = a.diameter >= 0.14; // km ≈ 140 m
-    if ((isPha || moidRisk) && bigEnough) {
-      return 'Extreme Danger 🔥🔥🔥';
-    } else if (isPha || moidRisk) {
-      return 'Moderate Risk ⚠️';
-    } else {
-      return 'Safe ✅';
-    }
-  }
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    super.dispose();
-  }
-
+  // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 400;
     final aspectRatio = isSmallScreen ? 0.8 : 0.9;
 
+    final items = _filtered.take(_visibleCount).toList();
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Sök efter Asteroids")),
+      appBar: AppBar(title: const Text('Sök efter Asteroids')),
       body: Column(
         children: [
           // Search
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
-              decoration: const InputDecoration(labelText: 'Sök asteroid namn'),
+              decoration:
+              const InputDecoration(labelText: 'Sök asteroid namn'),
               onChanged: _onSearchChanged,
             ),
           ),
 
-          // Controls: Online/Offline + Limits
+          // Controls row
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: Row(
               children: [
-                // Online/Offline toggle
+                // Online / Offline
                 Expanded(
                   child: SwitchListTile.adaptive(
                     dense: true,
-                    title: Text(_onlineMode
-                        ? 'Online (API enabled)'
-                        : 'Offline (CSV only)'),
+                    title: Text(
+                      _onlineMode
+                          ? 'Online (API enabled)'
+                          : 'Offline (CSV only)',
+                    ),
                     value: _onlineMode,
                     onChanged: (v) {
                       setState(() => _onlineMode = v);
-                      if (_onlineMode) {
-                        _enrichBatch(_filtered);
-                      }
+                      if (_onlineMode) _enrichBatch(_filtered);
                     },
                   ),
                 ),
 
                 const SizedBox(width: 8),
 
-                // CSV page size
-                DropdownButton<int>(
-                  value: _pageSize,
-                  items: const [25, 50, 100, 200].map((n) => DropdownMenuItem(value: n, child: Text('$n'))).toList(),
-                  onChanged: (n) async {
-                    if (n == null) return;
-                    setState(() => _pageSize = n);
-                    await _loadFirstPage();
-                  },
+                // CSV limit
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('CSV'),
+                    const SizedBox(width: 6),
+                    DropdownButton<int>(
+                      value: _csvLimit,
+                      items: const [10, 25, 50, 100, 200]
+                          .map((n) => DropdownMenuItem(
+                        value: n,
+                        child: Text('$n'),
+                      ))
+                          .toList(),
+                      onChanged: (n) async {
+                        if (n == null) return;
+                        setState(() => _csvLimit = n);
+                        await _loadCsv(); // re-read with new limit
+                      },
+                    ),
+                  ],
                 ),
 
-// API enrichment limit
-                DropdownButton<int>(
-                  value: _asterankLimit,
-                  items: const [10, 25, 50, 100, 200].map((n) => DropdownMenuItem(value: n, child: Text('$n'))).toList(),
-                  onChanged: (n) {
-                    if (n == null) return;
-                    setState(() => _asterankLimit = n);
-                    if (_onlineMode) _enrichBatch(_items);
-                  },
-                ),
+                const SizedBox(width: 8),
 
+                // API enrichment limit
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('API'),
+                    const SizedBox(width: 6),
+                    DropdownButton<int>(
+                      value: _asterankLimit,
+                      items: const [10, 25, 50, 100, 200]
+                          .map((n) => DropdownMenuItem(
+                        value: n,
+                        child: Text('$n'),
+                      ))
+                          .toList(),
+                      onChanged: (n) {
+                        if (n == null) return;
+                        setState(() => _asterankLimit = n);
+                        if (_onlineMode) _enrichBatch(_filtered);
+                      },
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
 
-          // Grid with infinite scroll
+          // Grid + infinite scroll
           Expanded(
             child: NotificationListener<ScrollNotification>(
               onNotification: (sn) {
                 if (sn.metrics.pixels >= sn.metrics.maxScrollExtent - 200) {
-                  _loadNextPage(); // fetch next page from DB
+                  setState(() {
+                    _visibleCount =
+                        (_visibleCount + _pageSize).clamp(0, _filtered.length);
+                  });
                 }
                 return false;
               },
               child: GridView.builder(
-                itemCount: _items.length,
+                itemCount: items.length,
                 gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: 300,
                   mainAxisSpacing: 8,
@@ -241,12 +283,13 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
                 ),
                 padding: const EdgeInsets.all(8),
                 itemBuilder: (context, index) {
-                  final asteroid = _items[index];
+                  final asteroid = items[index];
 
                   // On-demand enrichment when visible (only in online mode)
                   if (_onlineMode && !_hasAnyAsterank(asteroid)) {
                     _fetchAndAttachAsterank(asteroid);
                   }
+
                   final isLoadingAsterank = _onlineMode &&
                       _enriching.contains(asteroid.id) &&
                       !_hasAnyAsterank(asteroid);
@@ -258,9 +301,10 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
                     onTap: () {
                       Navigator.of(context).push(
                         PageRouteBuilder(
-                          transitionDuration: const Duration(milliseconds: 350),
+                          transitionDuration:
+                          const Duration(milliseconds: 350),
                           reverseTransitionDuration:
-                              const Duration(milliseconds: 250),
+                          const Duration(milliseconds: 250),
                           pageBuilder: (_, animation, __) =>
                               AsteroidDetailsPage(asteroid: asteroid),
                           transitionsBuilder: (_, animation, __, child) {

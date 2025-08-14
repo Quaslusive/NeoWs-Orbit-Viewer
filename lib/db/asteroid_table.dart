@@ -1,3 +1,4 @@
+/*
 import 'package:drift/drift.dart';
 
 class Asteroids extends Table {
@@ -27,3 +28,4 @@ class Asteroids extends Table {
   @override
   Set<Column> get primaryKey => {id};
 }
+*/

@@ -6,6 +6,7 @@ import 'package:csv/csv.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
+/*
 
   Future<List<Asteroid>> loadAsteroidsFromCsv() async {
     final rawData = await rootBundle.loadString('assets/astroidReadTest.csv');
@@ -30,6 +31,7 @@ class HomePage extends StatelessWidget {
       );
     }).toList();
   }
+*/
 
 
   @override
@@ -71,6 +73,13 @@ class HomePage extends StatelessWidget {
                 Navigator.pushNamed(context, "/orbit_page");
               },
             ),  ListTile(
+              leading: const Icon(Icons.info),
+              title: const Text("acknowledgements"),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, "/orbit_page");
+              },
+            ),    ListTile(
               leading: const Icon(Icons.settings),
               title: const Text("Settings"),
               onTap: () {

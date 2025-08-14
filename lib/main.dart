@@ -4,6 +4,8 @@ import 'package:neows_app/pages/asteroid_page.dart';
 import 'package:neows_app/pages/homepage.dart';
 import 'package:neows_app/pages/orbit_hybrid_page.dart';
 import 'package:neows_app/pages/asteroid_search.dart';
+import 'package:neows_app/pages/acknowledgements.dart';
+import 'package:neows_app/pages/settings.dart';
 
 
 Future<void> main() async {
@@ -30,6 +32,8 @@ class MyApp extends StatelessWidget {
         "/asteroid_page": (context) => const AsteroidPage(),
         "/orbit_hybrid_page": (context) => const OrbitHybridPage(),
         "/asteroid_search": (context) => const AsteroidSearchPage(),
+       /* "/acknowledgements": (context) => const AcknowledgementsPage(),
+        "/settings": (context) => const SettingsPage(),*/
 
       },
     );
