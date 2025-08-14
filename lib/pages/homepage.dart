@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:neows_app/pages/settings_page.dart';
+import 'package:neows_app/pages/acknowledgements_page.dart';
 import 'package:neows_app/model/asteroid_csv.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:csv/csv.dart';
@@ -77,14 +79,14 @@ class HomePage extends StatelessWidget {
               title: const Text("acknowledgements"),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.pushNamed(context, "/orbit_page");
+                Navigator.pushNamed(context, "/acknowledgements_page");
               },
             ),    ListTile(
               leading: const Icon(Icons.settings),
               title: const Text("Settings"),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.pushNamed(context, "/orbit_page");
+                Navigator.pushNamed(context, "/settings_page");
               },
             ),
           ],
