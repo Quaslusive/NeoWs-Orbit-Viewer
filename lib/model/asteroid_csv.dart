@@ -24,6 +24,7 @@ class Asteroid {
   String? asterankSpec;
   String? asterankFullName;
 
+/*
   void applyAsterank(AsterankInfo info) {
     asterankPriceUsd   = info.price ?? asterankPriceUsd;
     asterankAlbedo     = info.pv ?? asterankAlbedo;
@@ -32,6 +33,27 @@ class Asteroid {
     asterankSpec       = info.spec ?? asterankSpec;
     asterankFullName   = info.fullName ?? asterankFullName;
   }
+
+  Asteroid asteroidFromAsterankInfo(AsterankInfo i) {
+    return Asteroid(
+      id: i.name ?? i.fullName ?? 'NA',
+      name: i.name ?? i.fullName ?? 'Unknown',
+      fullName: i.fullName ?? i.name ?? 'Unknown',
+      diameter: i.diameter ?? 0.0,
+      albedo: i.pv ?? 0.0,
+      neo: 'unknown',
+      pha: 'unknown',
+      rotationPeriod: 0.0,
+      classType: i.spec ?? 'N/A',
+      orbitId: 0,
+      moid: i.moid ?? 0.0,
+      a: i.a ?? 0.0,
+      e: i.e ?? 0.0,
+    )
+      ..applyAsterank(i);
+  }
+*/
+
 
   Asteroid({
     required this.id,
