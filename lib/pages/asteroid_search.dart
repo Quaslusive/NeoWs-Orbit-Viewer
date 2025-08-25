@@ -1,20 +1,33 @@
+// lib/pages/asteroid_search_page.dart
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
-import 'package:csv/csv.dart';
-import 'package:flutter/foundation.dart' show compute;
 
+// Services + mappers
+import 'package:neows_app/service/neoWs_service.dart';
+import 'package:neows_app/service/asterank_api_service.dart';
+import 'package:neows_app/service/offline_mpc_service.dart';
+import 'package:neows_app/mappers/asteroid_mappers.dart';
+
+// UI + model
 import 'package:neows_app/model/asteroid_csv.dart';
 import 'package:neows_app/pages/asteroid_details_page.dart';
 import 'package:neows_app/widget/asteroid_card.dart';
 
-// ✅ Use MPC service + mapper
-import 'package:neows_app/service/asterank_api_service.dart';
-import 'package:neows_app/service/asterank_mpc_mapper.dart';
+// Envied key
+import 'package:neows_app/env/env.dart';
 
-// --- CSV parsing (background) ---
-List<List<dynamic>> _parseCsv(String raw) =>
-    const CsvToListConverter(eol: '\n').convert(raw);
+// ----- Source selector -----
+enum ApiSource { neows, mpcOnline, mpcOffline }
+
+extension ApiSourceX on ApiSource {
+  String get label => switch (this) {
+    ApiSource.neows => 'NeoWs',
+    ApiSource.mpcOnline => 'MPC',
+    ApiSource.mpcOffline => 'Offline',
+  };
+  bool get supportsDate => this == ApiSource.neows;
+}
 
 class AsteroidSearchPage extends StatefulWidget {
   const AsteroidSearchPage({super.key});
@@ -23,27 +36,39 @@ class AsteroidSearchPage extends StatefulWidget {
 }
 
 class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
-  // ✅ MPC service with dev logs enabled
-  final AsterankApiService _mpc = AsterankApiService(enableLogs: true);
+  // Services
+  late final NeoWsService _neo;
+  late final AsterankApiService _mpcOnline;
+  late final OfflineMpcService _mpcOffline;
 
-  // Data
-  List<Asteroid> _csvAsteroids = []; // offline fallback
-  List<Asteroid> _filtered = [];
+  // User options
+  ApiSource _source = ApiSource.neows;
+  int _limit = 50; // clamp 10–1000 where used
+  DateTimeRange? _neoRange; // NeoWs only
 
-  // Modes & limits
-  bool _onlineMode = true; // API search when true
-  int _csvLimit = 50;      // rows to load from CSV
-
-  // UI state
+  // UI/data state
+  String _query = '';
   bool _loading = false;
   Timer? _debounce;
+  List<Asteroid> _filtered = [];
 
-  // ---------- lifecycle ----------
+  // Orbit enrichment cache/throttle (instance-scoped)
+  final Map<String, ({double a, double e})> _orbitCache = {};
+  final Set<String> _orbitLoading = {};
+  int _orbitActive = 0;
+  static const int _orbitMaxConcurrent = 2;
+
   @override
   void initState() {
     super.initState();
-    _initialLoad(); // seed list (API or CSV)
-    _loadCsv();     // prepare offline cache
+    _neo = NeoWsService(Env.nasaApiKey);
+    _mpcOnline = AsterankApiService(enableLogs: true);
+    _mpcOffline = OfflineMpcService();
+
+    // Preload offline file (CSV: readable_des,des,H,a,e,i,moid)
+    _mpcOffline.loadFromAssets('assets/mpc_subset.csv');
+
+    _dispatchSearch(currentTerm: '');
   }
 
   @override
@@ -52,115 +77,132 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
     super.dispose();
   }
 
-  // ---------- CSV load (fallback) ----------
-  Future<void> _loadCsv() async {
-    try {
-      final raw = await rootBundle.loadString('lib/assets/astroidReadTest.csv');
-      final csv = await compute(_parseCsv, raw);
+  // Search input (debounced)
+  void _onSearchChanged(String q) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      setState(() => _query = q.trim());
+      _dispatchSearch(currentTerm: _query);
+    });
+  }
 
-      final list = <Asteroid>[];
-      for (int i = 1; i < csv.length && i <= _csvLimit; i++) {
-        final row = csv[i];
-        list.add(
-          Asteroid(
-            id: (row[0] ?? '').toString(),
-            name: (row[4] ?? '').toString(),
-            fullName: (row[2] ?? '').toString(),
-            diameter: double.tryParse(row[15].toString()) ?? 0.0,
-            albedo: double.tryParse(row[17].toString()) ?? 0.0,
-            neo: (row[6] ?? '').toString(),
-            pha: (row[7] ?? '').toString(),
-            rotationPeriod: double.tryParse(row[18].toString()) ?? 0.0,
-            classType: (row[60] ?? '').toString(),
-            orbitId: int.tryParse(row[27].toString()) ?? 0,
-            moid: double.tryParse(row[45].toString()) ?? 0.0,
-            a: double.tryParse(row[33].toString()) ?? 0.0,
-            e: double.tryParse(row[32].toString()) ?? 0.0,
-          ),
-        );
+  // Orbit lazy enrichment
+  Future<void> _ensureOrbit(Asteroid ast) async {
+    if (ast.a > 0 && ast.e > 0) return;
+    if (_orbitCache.containsKey(ast.id)) {
+      if (mounted) setState(() {});
+      return;
+    }
+    if (_orbitLoading.contains(ast.id) || _orbitActive >= _orbitMaxConcurrent) return;
+
+    final term = (ast.fullName.isNotEmpty ? ast.fullName : ast.name).trim();
+    if (term.isEmpty) return;
+
+    _orbitLoading.add(ast.id);
+    _orbitActive++;
+    try {
+      // 1) Offline first
+      try {
+        final off = await _mpcOffline.search(term: term, limit: 1);
+        if (off.isNotEmpty) {
+          final a = (off.first['a'] as num?)?.toDouble();
+          final e = (off.first['e'] as num?)?.toDouble();
+          if (a != null && a > 0 && e != null && e > 0) {
+            _orbitCache[ast.id] = (a: a, e: e);
+            if (mounted) setState(() {});
+            return;
+          }
+        }
+      } catch (_) {}
+
+      // 2) Online fallback
+      try {
+        final on = await _mpcOnline.searchMany(term, limit: 1);
+        if (on.isNotEmpty) {
+          final a = on.first.a;
+          final e = on.first.e;
+          if (a != null && a > 0 && e != null && e > 0) {
+            _orbitCache[ast.id] = (a: a, e: e);
+            if (mounted) setState(() {});
+          }
+        }
+      } catch (e) {
+        debugPrint('Online MPC orbit fetch failed: $e');
       }
-      if (!mounted) return;
-      setState(() => _csvAsteroids = list);
-    } catch (_) {
-      // ignore CSV errors; API mode still works
+    } finally {
+      _orbitLoading.remove(ast.id);
+      _orbitActive = math.max(0, _orbitActive - 1); // keep int
     }
   }
 
-  // ---------- Initial load ----------
-  Future<void> _initialLoad() async {
+  // Dispatcher
+  Future<void> _dispatchSearch({required String currentTerm}) async {
     setState(() => _loading = true);
     try {
-      if (_onlineMode) {
-        // ✅ use MPC service
-        final rows = await _mpc.fetchTop(limit: 50);
-        setState(() => _filtered = rows.map(asteroidFromMpc).toList());
-      } else {
-        await _loadCsv();
-        setState(() => _filtered = _csvAsteroids.take(50).toList());
+      final lim = _limit.clamp(10, 1000);
+
+      switch (_source) {
+        case ApiSource.neows:
+          final now = DateTime.now();
+          final dr = _neoRange ?? DateTimeRange(start: now, end: now);
+          final rows = await _neo.feed(dr, lim);
+          _filtered = rows.map(asteroidFromNeowsMap).toList();
+          break;
+
+        case ApiSource.mpcOnline:
+          final rows = await _mpcOnline.searchMany(currentTerm, limit: lim);
+          _filtered = rows.map(_asteroidFromMpcRow).toList();
+          break;
+
+        case ApiSource.mpcOffline:
+          final rows = await _mpcOffline.search(term: currentTerm, limit: lim);
+          _filtered = rows.map(asteroidFromMpcMap).toList();
+          break;
       }
     } catch (e) {
-      debugPrint('Initial load failed: $e');
-      try {
-        await _loadCsv();
-        setState(() => _filtered = _csvAsteroids.take(50).toList());
-      } catch (_) {}
+      debugPrint('Dispatch error: $e');
+      _filtered = [];
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  // ---------- Search ----------
-  void _onSearchChanged(String q) {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () async {
-      final term = q.trim();
-      if (term.isEmpty) {
-        setState(() => _filtered = []);
-        return;
-      }
+  // MpcRow -> Asteroid adapter
+  Asteroid _asteroidFromMpcRow(MpcRow r) {
+    final display = (r.readableDes ?? r.des ?? 'Unknown');
+    return Asteroid(
+      id: r.des ?? display,
+      name: display,
+      fullName: display,
+      diameter: 0.0,
+      albedo: 0.0,
+      neo: 'unknown',
+      pha: 'unknown',
+      rotationPeriod: 0.0,
+      classType: 'MPC',
+      orbitId: 0,
+      moid: r.moid ?? 0.0,
+      a: r.a ?? 0.0,
+      e: r.e ?? 0.0,
+    );
+  }
 
-      if (_onlineMode) {
-        try {
-          setState(() => _loading = true);
-          // ✅ call MPC search + map
-          final rows = await _mpc.searchMany(term, limit: 50);
-          setState(() {
-            _filtered = rows.map(asteroidFromMpc).toList();
-            _loading = false;
-          });
-        } catch (e) {
-          setState(() => _loading = false);
-          debugPrint('MPC search error: $e');
-        }
-      } else {
-        // CSV fallback
-        final needle = term.toLowerCase();
-        final items = _csvAsteroids.where((a) =>
-        a.name.toLowerCase().contains(needle) ||
-            a.fullName.toLowerCase().contains(needle)
-        ).toList();
-        setState(() => _filtered = items);
-      }
-    });
-  } // ← make sure this brace closes _onSearchChanged
-
-  // ---------- Danger label ----------
   String getDangerLevel(Asteroid a) {
     final isPha = a.pha.toUpperCase() == 'Y';
     final moidRisk = a.moid < 0.05;       // au
     final bigEnough = a.diameter >= 0.14; // km (~140m)
-    if ((isPha || moidRisk) && bigEnough) return 'Extreme Danger 🔥🔥🔥';
-    if (isPha || moidRisk) return 'Moderate Risk ⚠️';
-    return 'Safe ✅';
+    if ((isPha || moidRisk) && bigEnough) return 'Danger🔥';
+    if (isPha || moidRisk) return 'Moderate⚠️';
+    return 'Safe✅';
   }
 
-  // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Sök efter Asteroids')),
       body: Column(
         children: [
+          // Search box
           Padding(
             padding: const EdgeInsets.all(8),
             child: TextField(
@@ -168,58 +210,72 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
               onChanged: _onSearchChanged,
             ),
           ),
+
+          // Segmented source + Date
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4),
             child: Row(
               children: [
-                Expanded(
-                  child: SwitchListTile.adaptive(
-                    dense: true,
-                    title: Text(
-                      _onlineMode ? 'Online (API search: MPC)' : 'Offline (CSV only)',
-                    ),
-                    value: _onlineMode,
-                    onChanged: (v) => setState(() => _onlineMode = v),
+                SizedBox(
+                  height: 40,
+                  child: SegmentedButton<ApiSource>(
+                    segments: const [
+                      ButtonSegment(value: ApiSource.neows,     label: Text('NeoWs')),
+                      ButtonSegment(value: ApiSource.mpcOnline, label: Text('MPC')),
+                      ButtonSegment(value: ApiSource.mpcOffline,label: Text('Offline')),
+                    ],
+                    selected: {_source},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (sel) {
+                      setState(() {
+                        _source = sel.first;
+                        if (!_source.supportsDate) _neoRange = null;
+                      });
+                      _dispatchSearch(currentTerm: _query); // refresh with current text
+                    },
                   ),
                 ),
                 const SizedBox(width: 8),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('CSV'),
-                    const SizedBox(width: 6),
-                    DropdownButton<int>(
-                      value: _csvLimit,
-                      items: const [10, 25, 50, 100, 200]
-                          .map((n) => DropdownMenuItem(value: n, child: Text('$n')))
-                          .toList(),
-                      onChanged: (n) async {
-                        if (n == null) return;
-                        setState(() => _csvLimit = n);
-                        await _loadCsv();
-                      },
-                    ),
-                  ],
+                ElevatedButton(
+                  onPressed: _source.supportsDate ? () async {
+                    final now = DateTime.now();
+                    final init = _neoRange ?? DateTimeRange(start: now, end: now);
+                    final picked = await showDateRangePicker(
+                      context: context,
+                      firstDate: DateTime(1900),
+                      lastDate: DateTime(2100),
+                      initialDateRange: init,
+                    );
+                    if (picked != null) {
+                      setState(() => _neoRange = picked);
+                      _dispatchSearch(currentTerm: _query);
+                    }
+                  } : null,
+                  child: Text(
+                    _source.supportsDate
+                        ? (_neoRange == null
+                        ? 'Choose dates'
+                        : '${_neoRange!.start.toString().substring(0,10)} → ${_neoRange!.end.toString().substring(0,10)}')
+                        : 'Dates N/A',
+                  ),
                 ),
               ],
             ),
           ),
+
           if (_loading)
             const Padding(
               padding: EdgeInsets.only(bottom: 8),
               child: LinearProgressIndicator(),
             ),
+
+          // Results
           Expanded(
             child: _filtered.isEmpty && !_loading
-                ? Center(
+                ? const Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  _onlineMode
-                      ? 'No asteroids found via MPC.\nTry another search or switch to CSV.'
-                      : 'No CSV data loaded.\nCheck assets path or switch to MPC.',
-                  textAlign: TextAlign.center,
-                ),
+                padding: EdgeInsets.all(24),
+                child: Text('No asteroids found.'),
               ),
             )
                 : GridView.builder(
@@ -233,10 +289,21 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
               padding: const EdgeInsets.all(8),
               itemBuilder: (context, index) {
                 final asteroid = _filtered[index];
+
+                // orbit enrichment/cache
+                final cached = _orbitCache[asteroid.id];
+                final orbitA = cached?.a ?? (asteroid.a > 0 ? asteroid.a : null);
+                final orbitE = cached?.e ?? (asteroid.e > 0 ? asteroid.e : null);
+                final hasOrbit = (orbitA != null && orbitE != null);
+                if (!hasOrbit) _ensureOrbit(asteroid);
+
                 return AsteroidCard(
                   a: asteroid,
                   dangerLevel: getDangerLevel,
                   isLoadingAsterank: false,
+                  orbitA: orbitA,
+                  orbitE: orbitE,
+                  isOrbitLoading: _orbitLoading.contains(asteroid.id),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(

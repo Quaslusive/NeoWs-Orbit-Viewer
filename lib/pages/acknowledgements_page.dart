@@ -8,19 +8,20 @@ class AcknowledgementsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <_AckItem>[
-      _AckItem(
+      const _AckItem(
         title: 'NASA Near Earth Object Web Service (NeoWs)',
-        url: 'https://api.nasa.gov/neo/',
+        url: 'https://api.nasa.gov',
         blurb:
         'REST API with daily-updated near‑Earth asteroid data. Provided by NASA JPL.',
       ),
-      _AckItem(
+      /// Never used
+/*      const _AckItem(
         title: 'NASA Small‑Body Database (SBDB) Lookup',
         url: 'https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html',
         blurb:
         'Detailed orbital and physical parameters from JPL’s Solar System Dynamics Group.',
-      ),
-      _AckItem(
+      ),*/
+      const _AckItem(
         title: 'Asterank',
         url: 'https://www.asterank.com/',
         blurb:
@@ -68,13 +69,13 @@ class AcknowledgementsPage extends StatelessWidget {
               const SizedBox(height: 20),
               const _SectionDivider(label: 'Legal & Attribution'),
               const SizedBox(height: 12),
-              _DisclaimerText(
+              const _DisclaimerText(
                 text:
                 'Data from NASA is provided “as is,” without warranty of any kind. '
                     'This app is an independent project and is not affiliated with NASA, JPL, or Asterank.',
               ),
               const SizedBox(height: 12),
-              _DisclaimerText(
+              const _DisclaimerText(
                 text:
                 'If you operate one of the services credited here and prefer a different attribution, '
                     'please contact the developer.',
@@ -344,7 +345,7 @@ class _StarsPainter extends CustomPainter {
 
     // Deep gradient sky
     final rect = Offset.zero & size;
-    final sky = const LinearGradient(
+    const sky = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [

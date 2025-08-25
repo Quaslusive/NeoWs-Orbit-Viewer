@@ -1,3 +1,4 @@
+/*
 // lib/service/asterank_mpc_mapper.dart
 import 'package:neows_app/model/asteroid_csv.dart';
 import 'package:neows_app/service/asterank_api_service.dart';
@@ -20,3 +21,4 @@ Asteroid asteroidFromMpc(MpcRow r) {
     e: r.e ?? 0.0,
   );
 }
+*/

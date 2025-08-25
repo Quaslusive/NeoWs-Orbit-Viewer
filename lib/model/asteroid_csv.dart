@@ -1,4 +1,3 @@
-import 'package:neows_app/service/asterank_api_service.dart';
 
 class Asteroid {
   final String id;

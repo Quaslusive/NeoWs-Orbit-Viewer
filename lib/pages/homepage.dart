@@ -105,7 +105,14 @@ class HomePage extends StatelessWidget {
         ),
         const SizedBox(height: 40),
         ElevatedButton(
-          child: const Text("Gå till Asteroid sidan"),
+          child: const Text("Sök Asteroider med NeoWs och MPC"),
+          onPressed: () {
+            Navigator.pushNamed(context, "/asteroid_search");
+          },
+        ),
+        const SizedBox(height: 20),
+        ElevatedButton(
+          child: const Text("Gå till NeoWs "),
           onPressed: () {
             Navigator.pushNamed(context, "/asteroid_page");
           },
@@ -129,13 +136,6 @@ class HomePage extends StatelessWidget {
           child: const Text("Gå till Spacekit Orbit webviewer"),
           onPressed: () {
             Navigator.pushNamed(context, "/OrbitWebViewPage");
-          },
-        ),
-        const SizedBox(height: 20),
-        ElevatedButton(
-          child: const Text("Sök Asteroider (CSV)"),
-          onPressed: () {
-            Navigator.pushNamed(context, "/asteroid_search");
           },
         ),
       ],

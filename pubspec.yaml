@@ -46,6 +46,7 @@ flutter:
     - lib/assets/orbits/
     - lib/assets/astroidReadTest.csv
     - lib/assets/latest_fulldb.csv
+    - lib/assets/MPCORB.DAT
     - lib/assets/images/orbit_placeholder.png
     - .env
 
