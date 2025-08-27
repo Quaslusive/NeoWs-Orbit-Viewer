@@ -1,4 +1,3 @@
-// lib/pages/settings_page.dart
 import 'package:flutter/material.dart';
 import 'package:neows_app/settings/settings_controller.dart';
 import 'package:neows_app/settings/settings_model.dart';

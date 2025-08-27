@@ -1,4 +1,3 @@
-
 class Asteroid {
   final String id;
   final String name;
@@ -11,9 +10,9 @@ class Asteroid {
   final String classType;
   final int orbitId;
   final double moid;
-// test chart
   final double a;
   final double e;
+  final double i;
 
   // Asterank-enriched fields (all optional)
   double? asterankPriceUsd;
@@ -66,9 +65,9 @@ class Asteroid {
     required this.classType,
     required this.orbitId,
     required this.moid,
-    //test chart
     required this.a,
     required this.e,
+    required this.i,
   });
 
 }

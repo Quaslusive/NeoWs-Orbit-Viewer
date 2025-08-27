@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:neows_app/env/env.dart';
 import 'package:neows_app/pages/asteroid_page.dart';
@@ -18,7 +19,9 @@ Future<void> main() async {
   await settings.init();
 
   try {
-    print("it works ${Env.nasaApiKey}");
+    if (kDebugMode) {
+      print("it works ${Env.nasaApiKey}");
+    }
   } catch (e) {
     throw Exception("Couldn't load environment file: $e");
   }

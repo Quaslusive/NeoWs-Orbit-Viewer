@@ -1,4 +1,3 @@
-// lib/pages/asteroid_details_page.dart
 import 'package:flutter/material.dart';
 import 'package:neows_app/model/asteroid_csv.dart';
 // ✅ MPC service + DTO
@@ -19,11 +18,8 @@ class _AsteroidDetailsPageState extends State<AsteroidDetailsPage> {
   bool _loading = false;
   MpcRow? _mpcRow; // ✅ store fetched MPC data here
   double? _bestA() => _mpcRow?.a ?? widget.asteroid.a;
-
   double? _bestE() => _mpcRow?.e ?? widget.asteroid.e;
-
-  double? _bestI() =>
-      _mpcRow?.i; // CSV model didn’t have i; only MPC may provide it
+  double? _bestI() => _mpcRow?.i; // CSV model didn’t have i; only MPC may provide it
 
   /// Handy derived values for the UI if your widget wants them
   double? _perihelionQ() {

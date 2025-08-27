@@ -1,88 +1,87 @@
-import 'package:flutter/services.dart' show rootBundle;
-import 'package:csv/csv.dart';
+/*
+// lib/service/offline_mpc_service.dart
+import 'dart:io';
+import 'dart:convert';
 
 class OfflineMpcService {
-  List<Map<String, dynamic>>? _rows; // cached in memory
-  Map<String, int>? _idx;
+  List<Map<String, dynamic>> _rows = [];
+
+  Future<void> loadFromPath(String path) async {
+    final raw = await File(path).readAsString();
+    _rows = _parseCsv(raw);
+  }
 
   Future<void> loadFromAssets(String assetPath) async {
-    if (_rows != null) return; // already loaded
-    final raw = await rootBundle.loadString(assetPath);
-    final table = const CsvToListConverter().convert(raw);
-
-    if (table.isEmpty) {
-      _rows = const [];
-      _idx = const {};
-      return;
-    }
-
-    // header row
-    final header = table.first.map((e) => e.toString()).toList();
-    _idx = { for (var i = 0; i < header.length; i++) header[i] : i };
-
-    final r = <Map<String, dynamic>>[];
-    for (int k = 1; k < table.length; k++) {
-      final row = table[k];
-      T? at<T>(String col) {
-        final i = _idx![col];
-        if (i == null || i >= row.length) return null;
-        final v = row[i];
-        if (v == null) return null;
-        if (T == double) return (v is num ? v.toDouble() : double.tryParse(v.toString())) as T?;
-        if (T == String) return v.toString() as T?;
-        if (T == int) return (v is num ? v.toInt() : int.tryParse(v.toString())) as T?;
-        return v as T?;
-      }
-
-      r.add({
-        'readable_des': at<String>('readable_des') ?? at<String>('name') ?? '',
-        'des':          at<String>('des') ?? '',
-        'H':            at<double>('H'),
-        'a':            at<double>('a'),
-        'e':            at<double>('e'),
-        'i':            at<double>('i'),
-        'moid':         at<double>('moid'),
-      });
-    }
-
-    _rows = r;
+    // existing assets loader (rootBundle.loadString) -> _parseCsv(...)
   }
 
-  /// Local search with same shape as the online MPC map.
-  Future<List<Map<String, dynamic>>> search({
-    String? term,
-    required int limit,
-    double? minA, double? maxA,
-    double? minE, double? maxE,
-    double? minI, double? maxI,
-    double? minH, double? maxH,
-    double? minMoid, double? maxMoid,
-  }) async {
-    final rows = _rows ?? const <Map<String, dynamic>>[];
-    final needle = term?.toLowerCase().trim();
+  // very simple CSV parser (header: readable_des,des,H,a,e,i,moid)
+  List<Map<String, dynamic>> _parseCsv(String raw) {
+    final lines = const LineSplitter().convert(raw);
+    if (lines.isEmpty) return [];
+    final headers = lines.first.split(',');
+    return [
+      for (int i = 1; i < lines.length; i++)
+        _row(headers, lines[i]),
+    ];
+  }
 
-    bool inRange(String k, double? lo, double? hi, Map<String, dynamic> m) {
-      final v = (m[k] as num?)?.toDouble();
-      if (v == null) return false;
-      if (lo != null && v < lo) return false;
-      if (hi != null && v > hi) return false;
-      return true;
-    }
-
-    final filtered = rows.where((m) {
-      if (needle != null && needle.isNotEmpty) {
-        final d1 = (m['readable_des'] ?? '').toString().toLowerCase();
-        final d2 = (m['des'] ?? '').toString().toLowerCase();
-        if (!d1.contains(needle) && !d2.contains(needle)) return false;
+  Map<String, dynamic> _row(List<String> headers, String line) {
+    final cols = _splitCsv(line);
+    final m = <String, dynamic>{};
+    for (int i = 0; i < headers.length && i < cols.length; i++) {
+      final key = headers[i].trim();
+      final v = cols[i];
+      switch (key) {
+        case 'H':
+        case 'a':
+        case 'e':
+        case 'i':
+        case 'moid':
+          m[key] = double.tryParse(v);
+          break;
+        default:
+          m[key] = v;
       }
-      if ((minA != null || maxA != null) && !inRange('a', minA, maxA, m)) return false;
-      if ((minE != null || maxE != null) && !inRange('e', minE, maxE, m)) return false;
-      if ((minI != null || maxI != null) && !inRange('i', minI, maxI, m)) return false;
-      if ((minH != null || maxH != null) && !inRange('H', minH, maxH, m)) return false;
-      if ((minMoid != null || maxMoid != null) && !inRange('moid', minMoid, maxMoid, m)) return false;
-      return true;
-    });
+    }
+    return m;
+  }
 
-    return filtered.take(limit.clamp(10, 1000)).toList();
+  // naive CSV split (handles simple quoted values)
+  List<String> _splitCsv(String line) {
+    final out = <String>[];
+    final buf = StringBuffer();
+    bool quoted = false;
+    for (int i = 0; i < line.length; i++) {
+      final c = line[i];
+      if (c == '"') {
+        quoted = !quoted;
+      } else if (c == ',' && !quoted) {
+        out.add(buf.toString());
+        buf.clear();
+      } else {
+        buf.write(c);
+      }
+    }
+    out.add(buf.toString());
+    return out.map((s) => s.trim()).toList();
+  }
+
+  // basic search by term (readable_des/des), with limit
+  Future<List<Map<String, dynamic>>> search({
+    required String term,
+    int limit = 50,
+  }) async {
+    final q = term.trim().toLowerCase();
+    if (q.isEmpty) {
+      return _rows.take(limit).toList();
+    }
+    final res = _rows.where((r) {
+      final rd = (r['readable_des'] ?? '').toString().toLowerCase();
+      final des = (r['des'] ?? '').toString().toLowerCase();
+      return rd.contains(q) || des.contains(q);
+    }).take(limit).toList();
+    return res;
   }
 }
+*/

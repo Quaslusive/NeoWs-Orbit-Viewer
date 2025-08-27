@@ -4,36 +4,9 @@ import 'package:neows_app/pages/settings_page.dart';
 import 'package:neows_app/pages/acknowledgements_page.dart';
 import 'package:neows_app/model/asteroid_csv.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:csv/csv.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
-/*
-
-  Future<List<Asteroid>> loadAsteroidsFromCsv() async {
-    final rawData = await rootBundle.loadString('assets/astroidReadTest.csv');
-    final csvData = const CsvToListConverter(eol: '\\n').convert(rawData);
-    final rows = csvData.sublist(1); // Skip header
-
-    return rows.map((row) {
-      return Asteroid(
-        id: row[0].toString(),
-        name: row[4].toString(),
-        fullName: row[2].toString(),
-        diameter: double.tryParse(row[15].toString()) ?? 0.0,
-        albedo: double.tryParse(row[17].toString()) ?? 0.0,
-        neo: row[6].toString(),
-        pha: row[7].toString(),
-        rotationPeriod: double.tryParse(row[18].toString()) ?? 0.0,
-        classType: row[60].toString(),
-        orbitId: int.tryParse(row[27].toString()) ?? 0,
-        moid: double.tryParse(row[45].toString()) ?? 0.0,
-        a: double.tryParse(row[33].toString()) ?? 0.0,
-        e: double.tryParse(row[32].toString()) ?? 0.0,
-      );
-    }).toList();
-  }
-*/
 
 
   @override

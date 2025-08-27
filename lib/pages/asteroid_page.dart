@@ -82,15 +82,16 @@ class _AsteroidPageState extends State<AsteroidPage> {
                         builder: (BuildContext context) {
                           return AlertDialog(
                             title: Text(asteroid.name),
-                            content: Text('Vill du see mer om astroiden?'),
+                            content: const Text('Vill du see mer om astroiden?'),
                             actions: [
                               Center(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                  _launchURL(asteroid.nasaJplUrl);
-                                },
-                                child: const Text('NASA`s NeoWs Service'),
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop();
+                                 //   _launchURL(asteroid.nasaJplUrl);
+                                    _launchURL('${asteroid.nasaJplUrl}&view=VOP');
+                                  },
+                                  child: const Text('NASA`s NeoWs Service'),
                               ),
                               ),
                             ],

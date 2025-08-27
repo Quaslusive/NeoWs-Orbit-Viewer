@@ -1,5 +1,4 @@
 import 'package:neows_app/settings/settings_model.dart';
-import 'package:neows_app/settings/settings_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 
