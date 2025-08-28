@@ -11,6 +11,10 @@ import 'package:neows_app/settings/settings_model.dart';
 import 'package:neows_app/settings/settings_service.dart';
 import 'package:neows_app/pages/settings_page.dart';
 
+import 'package:neows_app/pages/news_page.dart';
+import 'package:neows_app/service/news_repository.dart';
+import 'package:neows_app/service/spaceflight_news_service.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -56,8 +60,9 @@ class MyApp extends StatelessWidget {
             "/orbit_hybrid_page": (context) => const OrbitHybridPage(),
             "/asteroid_search": (context) => const AsteroidSearchPage(),
             "/acknowledgements_page": (context) => const AcknowledgementsPage(),
-            // Controller is now in scope here ✅
             "/settings_page": (context) => SettingsPage(controller: settings),
+            "/news": (context) => NewsPage(repo: NewsRepository(SpaceflightNewsService()),
+            ),
           },
         );
       },

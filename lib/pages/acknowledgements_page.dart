@@ -14,18 +14,17 @@ class AcknowledgementsPage extends StatelessWidget {
         blurb:
         'REST API with daily-updated near‑Earth asteroid data. Provided by NASA JPL.',
       ),
-      /// Never used
-/*      const _AckItem(
-        title: 'NASA Small‑Body Database (SBDB) Lookup',
-        url: 'https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html',
-        blurb:
-        'Detailed orbital and physical parameters from JPL’s Solar System Dynamics Group.',
-      ),*/
       const _AckItem(
         title: 'Asterank',
-        url: 'https://www.asterank.com/',
+        url: 'https://www.asterank.com',
         blurb:
         'Open asteroid database with orbital elements, physical estimates, and visuals.',
+      ),
+     const _AckItem(
+        title: 'Spaceflight News API v4',
+        url: 'Website: https://spaceflightnewsapi.net',
+        blurb:
+        'Free, no‑key REST API for spaceflight articles',
       ),
     ];
 
@@ -79,6 +78,11 @@ class AcknowledgementsPage extends StatelessWidget {
                 text:
                 'If you operate one of the services credited here and prefer a different attribution, '
                     'please contact the developer.',
+              ),
+              const SizedBox(height: 28),
+              const _DisclaimerText(
+                text:
+                'Use of Spaceflight News API - While this API is free to use, we do encourage developers to support us through Patreon to keep the API up and running.',
               ),
               const SizedBox(height: 28),
             ],

@@ -5,6 +5,10 @@ import 'package:neows_app/pages/acknowledgements_page.dart';
 import 'package:neows_app/model/asteroid_csv.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
+import 'package:neows_app/pages/news_page.dart';
+import 'package:neows_app/service/news_repository.dart';
+import 'package:neows_app/service/spaceflight_news_service.dart';
+
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -88,6 +92,14 @@ class HomePage extends StatelessWidget {
           child: const Text("Gå till NeoWs "),
           onPressed: () {
             Navigator.pushNamed(context, "/asteroid_page");
+          },
+        ),
+        const SizedBox(height: 20),
+        ElevatedButton(
+          child: const Text("News "),
+          onPressed: () {
+            Navigator.of(context).pushNamed('/news');
+            //   Navigator.pushNamed(context, "/news");
           },
         ),
         const SizedBox(height: 20),
