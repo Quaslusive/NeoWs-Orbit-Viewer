@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 class AppBottomBar extends StatelessWidget {
   final TextEditingController searchController;
+  final FocusNode? searchFocusNode;
   final VoidCallback? onRefresh;
   final VoidCallback? onOpenFilters;
   final ValueChanged<String>? onSearchSubmitted;
@@ -10,6 +11,7 @@ class AppBottomBar extends StatelessWidget {
   const AppBottomBar({
     super.key,
     required this.searchController,
+    this.searchFocusNode,
     this.onRefresh,
     this.onOpenFilters,
     this.onSearchSubmitted,
@@ -38,6 +40,7 @@ class AppBottomBar extends StatelessWidget {
                 child: SizedBox(
                   height: 44,
                   child: TextField(
+                    focusNode: searchFocusNode,
                     controller: searchController,
                     textInputAction: TextInputAction.search,
                     onSubmitted: onSearchSubmitted,

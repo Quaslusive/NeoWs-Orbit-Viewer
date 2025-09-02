@@ -27,7 +27,6 @@ class BookmarksController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// For Undo – restore a previous set
   Future<void> restore(Set<int> previous) async {
     _ids = {...previous};
     await svc.save(_ids);

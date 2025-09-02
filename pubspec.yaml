@@ -29,6 +29,8 @@ dependencies:
  # web: ^1.1.1                   # NEW → provides toJS/js interop on web
   cached_network_image: ^3.3.1
   timeago: ^3.6.1
+  webview_flutter: ^4.13.0
+  flutter_slidable: ^3.1.0
 
 
 dev_dependencies:
