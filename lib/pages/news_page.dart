@@ -14,8 +14,11 @@ import 'package:neows_app/controllers/bookmarks_controller.dart';
 import 'package:neows_app/service/bookmarks_service.dart';
 import 'package:neows_app/pages/reader_screen.dart';
 
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
+
 class NewsPage extends StatefulWidget {
   final NewsRepository repo;
+
   const NewsPage({super.key, required this.repo});
 
   @override
@@ -34,13 +37,29 @@ class NewsPageState extends State<NewsPage> {
   final _searchFocus = FocusNode();
 
   // Bookmarks
-  late final BookmarksController bookmarks = BookmarksController(BookmarksService());
+  late final BookmarksController bookmarks =
+      BookmarksController(BookmarksService());
 
   // Filters
   int _days = 0;
-  final List<String> _topics = const ['All', 'Asteroid', 'NEO', 'Comet', 'Planetary defense'];
+  final List<String> _topics = const [
+    'All',
+    'Asteroid',
+    'NEO',
+    'Comet',
+    'Planetary defense'
+  ];
   int _topicIndex = 0;
-  final List<String> _sources = const ['All sources','NASA','ESA','SpaceNews','Space.com','Ars Technica','Teslarati','Phys.org'];
+  final List<String> _sources = const [
+    'All sources',
+    'NASA',
+    'ESA',
+    'SpaceNews',
+    'Space.com',
+    'Ars Technica',
+    'Teslarati',
+    'Phys.org'
+  ];
   int _sourceIndex = 0;
 
   // Preferences
@@ -93,10 +112,12 @@ class NewsPageState extends State<NewsPage> {
   // Helpers
   void scrollToTop() {
     if (!_sc.hasClients) return;
-    _sc.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+    _sc.animateTo(0,
+        duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
   }
 
-  DateTime? _sinceFromDays(int days) => days <= 0 ? null : DateTime.now().toUtc().subtract(Duration(days: days));
+  DateTime? _sinceFromDays(int days) =>
+      days <= 0 ? null : DateTime.now().toUtc().subtract(Duration(days: days));
 
   String _currentQuery() {
     final typed = _searchCtrl.text.trim();
@@ -107,12 +128,18 @@ class NewsPageState extends State<NewsPage> {
   Future<void> _applyAll({bool savePrefs = true, String? newSearch}) async {
     HapticFeedback.lightImpact();
     await ctrl.refresh(
-      newSearch: (newSearch ?? _currentQuery()).isEmpty ? null : (newSearch ?? _currentQuery()),
+      newSearch: (newSearch ?? _currentQuery()).isEmpty
+          ? null
+          : (newSearch ?? _currentQuery()),
       newSince: _sinceFromDays(_days),
       newNewsSite: _sourceIndex == 0 ? null : _sources[_sourceIndex],
     );
     if (savePrefs) {
-      await prefs.saveFilters(days: _days, topic: _topicIndex, source: _sourceIndex, query: _searchCtrl.text.trim());
+      await prefs.saveFilters(
+          days: _days,
+          topic: _topicIndex,
+          source: _sourceIndex,
+          query: _searchCtrl.text.trim());
     }
     scrollToTop();
   }
@@ -121,9 +148,15 @@ class NewsPageState extends State<NewsPage> {
   List<SpaceflightArticle> _sorted(List<SpaceflightArticle> xs) {
     final list = [...xs];
     switch (_sort) {
-      case NewsSort.newest: list.sort((a,b)=>b.publishedAt.compareTo(a.publishedAt)); break;
-      case NewsSort.oldest: list.sort((a,b)=>a.publishedAt.compareTo(b.publishedAt)); break;
-      case NewsSort.sourceAZ: list.sort((a,b)=>a.newsSite.compareTo(b.newsSite)); break;
+      case NewsSort.newest:
+        list.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+        break;
+      case NewsSort.oldest:
+        list.sort((a, b) => a.publishedAt.compareTo(b.publishedAt));
+        break;
+      case NewsSort.sourceAZ:
+        list.sort((a, b) => a.newsSite.compareTo(b.newsSite));
+        break;
     }
     return list;
   }
@@ -132,77 +165,142 @@ class NewsPageState extends State<NewsPage> {
   int? _firstNewIndex(List<SpaceflightArticle> items) {
     final since = _lastOpenedAt;
     if (since == null) return null;
-    for (int i=0;i<items.length;i++) {
+    for (int i = 0; i < items.length; i++) {
       if (items[i].publishedAt.isAfter(since)) return i;
     }
     return null;
   }
 
   Future<void> _openFiltersSheet() async {
-    final result = await showModalBottomSheet<_FiltersResult>(
+    final result = await showCupertinoModalBottomSheet<_FiltersResult>(
       context: context,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      expand: false, // vi använder egen scroll i innehållet
+      duration: const Duration(milliseconds: 420), // mjukare, lite längre
+      enableDrag: true,
+      backgroundColor: Colors.transparent,        // för rundade hörn + skugga
       builder: (context) {
         int tmpDays = _days;
         int tmpTopic = _topicIndex;
         int tmpSource = _sourceIndex;
-        return StatefulBuilder(
-          builder: (context, setSheet) => SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Filters', style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 12),
-                  Text('Time', style: Theme.of(context).textTheme.labelLarge),
-                  const SizedBox(height: 6),
-                  Wrap(spacing: 8, children: const [(0,'All'),(1,'Today'),(7,'7 days'),(30,'30 days')]
-                      .map((c)=>ChoiceChip(label: Text(c.$2), selected: false)).toList()// placeholders
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: const [(0,'All'),(1,'Today'),(7,'7 days'),(30,'30 days')].map((c){
-                      return StatefulBuilder(builder: (context, _) { return const SizedBox.shrink(); });
-                    }).toList(),
-                  ),
-                  // Custom interactive row:
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      for (final c in const [(0,'All'),(1,'Today'),(7,'7 days'),(30,'30 days')])
-                        ChoiceChip(
-                          label: Text(c.$2),
-                          selected: tmpDays == c.$1,
-                          onSelected: (_)=> setSheet(()=> tmpDays = c.$1),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text('Topic', style: Theme.of(context).textTheme.labelLarge),
-                  const SizedBox(height: 6),
-                  Wrap(spacing: 8, children: List.generate(_topics.length, (i)=> ChoiceChip(
-                    label: Text(_topics[i]), selected: tmpTopic==i, onSelected: (_)=> setSheet(()=> tmpTopic=i),
-                  ))),
-                  const SizedBox(height: 16),
-                  Text('Source', style: Theme.of(context).textTheme.labelLarge),
-                  const SizedBox(height: 6),
-                  Wrap(spacing: 8, children: List.generate(_sources.length, (i)=> ChoiceChip(
-                    label: Text(_sources[i]), selected: tmpSource==i, onSelected: (_)=> setSheet(()=> tmpSource=i),
-                  ))),
-                  const SizedBox(height: 16),
-                  Row(children: [
-                    Expanded(child: FilledButton.icon(
-                      icon: const Icon(Icons.check),
-                      label: const Text('Apply'),
-                      onPressed: () => Navigator.pop(context, _FiltersResult(days: tmpDays, topicIndex: tmpTopic, sourceIndex: tmpSource)),
-                    )),
-                  ]),
-                ],
+
+        void _clearAll(StateSetter setSheet) {
+          setSheet(() {
+            tmpDays = 0;
+            tmpTopic = 0;
+            tmpSource = 0;
+          });
+        }
+
+        return SafeArea(
+          top: false,
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: DraggableScrollableSheet(
+                expand: false,
+                initialChildSize: 0.66, // lite högre direkt
+                minChildSize: 0.2,
+                maxChildSize: 0.8,
+                builder: (ctx, scrollController) {
+                  return StatefulBuilder(
+                    builder: (ctx, setSheet) => Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        16, 8, 16,
+                        16 + MediaQuery.of(ctx).viewInsets.bottom,
+                      ),
+                      child: ListView(
+                        controller: ModalScrollController.of(context), // integrerad drag/scroll
+                        children: [
+                          // Header + Clear all
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text('Filters',
+                                    style: Theme.of(ctx).textTheme.titleLarge),
+                              ),
+                              TextButton.icon(
+                                icon: const Icon(Icons.restart_alt),
+                                label: const Text('Clear all'),
+                                onPressed: () => _clearAll(setSheet),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          Text('Time', style: Theme.of(ctx).textTheme.labelLarge),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 8, runSpacing: 8,
+                            children: [
+                              for (final c in const [
+                                (0, 'All'), (1, 'Today'), (7, '7 days'), (30, '30 days')
+                              ])
+                                ChoiceChip(
+                                  label: Text(c.$2),
+                                  selected: tmpDays == c.$1,
+                                  onSelected: (_) => setSheet(() => tmpDays = c.$1),
+                                ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 16),
+                          Text('Topic', style: Theme.of(ctx).textTheme.labelLarge),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 8, runSpacing: 8,
+                            children: List.generate(_topics.length, (i) => ChoiceChip(
+                              label: Text(_topics[i]),
+                              selected: tmpTopic == i,
+                              onSelected: (_) => setSheet(() => tmpTopic = i),
+                            )),
+                          ),
+
+                          const SizedBox(height: 16),
+                          Text('Source', style: Theme.of(ctx).textTheme.labelLarge),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 8, runSpacing: 8,
+                            children: List.generate(_sources.length, (i) => ChoiceChip(
+                              label: Text(_sources[i]),
+                              selected: tmpSource == i,
+                              onSelected: (_) => setSheet(() => tmpSource = i),
+                            )),
+                          ),
+
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  icon: const Icon(Icons.restart_alt),
+                                  label: const Text('Clear All'),
+                                  onPressed: () {
+                                    Navigator.pop(context, const _FiltersResult(days: 0, topicIndex: 0, sourceIndex: 0));                                  }
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: FilledButton.icon(
+                                  icon: const Icon(Icons.check),
+                                  label: const Text('Apply'),
+                                  onPressed: () => Navigator.pop(
+                                    context,
+                                    _FiltersResult(
+                                      days: tmpDays,
+                                      topicIndex: tmpTopic,
+                                      sourceIndex: tmpSource,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -223,9 +321,12 @@ class NewsPageState extends State<NewsPage> {
   void _onOpenArticle(SpaceflightArticle a) async {
     final uri = Uri.parse(a.url);
     if (_openInApp) {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_)=> ReaderScreen(url: uri)));
+      Navigator.of(context)
+          .push(MaterialPageRoute(builder: (_) => ReaderScreen(url: uri)));
     } else {
-      if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
     }
   }
 
@@ -242,64 +343,85 @@ class NewsPageState extends State<NewsPage> {
             onSelected: (v) async {
               switch (v) {
                 case 1: // view
-                  setState(()=> _view = (_view == NewsViewMode.list) ? NewsViewMode.grid : NewsViewMode.list);
+                  setState(() => _view = (_view == NewsViewMode.list)
+                      ? NewsViewMode.grid
+                      : NewsViewMode.list);
                   await prefs.saveViewMode(_view);
                   break;
                 case 2: // density
-                  setState(()=> _density = (_density == NewsDensity.comfortable) ? NewsDensity.compact : NewsDensity.comfortable);
+                  setState(() => _density =
+                      (_density == NewsDensity.comfortable)
+                          ? NewsDensity.compact
+                          : NewsDensity.comfortable);
                   await prefs.saveDensity(_density);
                   break;
                 case 3: // sort
                   final ns = await showMenu<NewsSort>(
                     context: context,
-                    position: RelativeRect.fromLTRB(1000, 80, 16, 0),
+                    position: const RelativeRect.fromLTRB(1000, 80, 16, 0),
                     items: const [
-                      PopupMenuItem(value: NewsSort.newest, child: Text('Newest')),
-                      PopupMenuItem(value: NewsSort.oldest, child: Text('Oldest')),
-                      PopupMenuItem(value: NewsSort.sourceAZ, child: Text('Source A–Z')),
+                      PopupMenuItem(
+                          value: NewsSort.newest, child: Text('Newest')),
+                      PopupMenuItem(
+                          value: NewsSort.oldest, child: Text('Oldest')),
+                      PopupMenuItem(
+                          value: NewsSort.sourceAZ, child: Text('Source A–Z')),
                     ],
                   );
-                  if (ns != null) { setState(()=> _sort = ns); await prefs.saveSort(_sort); }
+                  if (ns != null) {
+                    setState(() => _sort = ns);
+                    await prefs.saveSort(_sort);
+                  }
                   break;
                 case 4: // open in
-                  setState(()=> _openInApp = !_openInApp);
+                  setState(() => _openInApp = !_openInApp);
                   await prefs.saveOpenInApp(_openInApp);
                   break;
                 case 5: // low data
-                  setState(()=> _lowData = !_lowData);
+                  setState(() => _lowData = !_lowData);
                   await prefs.saveLowData(_lowData);
                   break;
               }
             },
-            itemBuilder: (c)=>[
-              PopupMenuItem(value: 1, child: Text('View: ' + (_view==NewsViewMode.list?'List':'Grid'))),
-              PopupMenuItem(value: 2, child: Text('Density: ' + (_density==NewsDensity.comfortable?'Comfortable':'Compact'))),
+            itemBuilder: (c) => [
+              PopupMenuItem(
+                  value: 1,
+                  child: Text('View: ${_view == NewsViewMode.list ? 'List' : 'Grid'}')),
+              PopupMenuItem(
+                  value: 2,
+                  child: Text('Density: ${_density == NewsDensity.comfortable
+                          ? 'Comfortable'
+                          : 'Compact'}')),
               const PopupMenuDivider(),
-              PopupMenuItem(value: 3, child: Text('Sort…')),
-              PopupMenuItem(value: 4, child: Text('Open in ' + (_openInApp?'App':'Browser'))),
-              PopupMenuItem(value: 5, child: Text('Low data: ' + (_lowData?'On':'Off'))),
+              const PopupMenuItem(value: 3, child: Text('Sort…')),
+              PopupMenuItem(
+                  value: 4,
+                  child: Text('Open in ${_openInApp ? 'App' : 'Browser'}')),
+              PopupMenuItem(
+                  value: 5,
+                  child: Text('Low data: ${_lowData ? 'On' : 'Off'}')),
             ],
           ),
         ],
       ),
-
       floatingActionButton: _showFab
           ? FloatingActionButton.extended(
-        onPressed: scrollToTop,
-        icon: const Icon(Icons.keyboard_arrow_up),
-        label: const Text('Top'),
-      )
+              onPressed: scrollToTop,
+              icon: const Icon(Icons.keyboard_arrow_up),
+              label: const Text('Top'),
+            )
           : null,
-
       bottomNavigationBar: AppBottomBar(
         searchController: _searchCtrl,
         searchFocusNode: _searchFocus,
         onSearchSubmitted: (q) => _applyAll(newSearch: q.trim()),
-        onClearSearch: () { _searchCtrl.clear(); _applyAll(newSearch: ''); },
+        onClearSearch: () {
+          _searchCtrl.clear();
+          _applyAll(newSearch: '');
+        },
         onOpenFilters: _openFiltersSheet,
         onRefresh: () => _applyAll(),
       ),
-
       body: AnimatedBuilder(
         animation: merged,
         builder: (context, _) {
@@ -331,10 +453,12 @@ class NewsPageState extends State<NewsPage> {
             // LIST
             return RefreshIndicator(
               onRefresh: _applyAll,
-              child: ExcludeSemantics( // keep this to avoid any remaining semantics churn
+              child: ExcludeSemantics(
+                // keep this to avoid any remaining semantics churn
                 child: ListView.separated(
                   controller: _sc,
                   physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   itemCount: items.length + (ctrl.exhausted ? 0 : 1),
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (context, index) {
@@ -350,7 +474,8 @@ class NewsPageState extends State<NewsPage> {
                     final isBm = bookmarks.isBookmarked(article.id);
 
                     final tile = _ArticleTileSimple(
-                      key: ValueKey('article_${article.id}'), // now accepted
+                      key: ValueKey('article_${article.id}'),
+                      // now accepted
                       article: article,
                       density: _density,
                       lowData: _lowData,
@@ -364,7 +489,9 @@ class NewsPageState extends State<NewsPage> {
                           ..showSnackBar(
                             SnackBar(
                               content: Text(nowBm ? 'Bookmarked' : 'Removed'),
-                              action: SnackBarAction(label: 'Undo', onPressed: () => bookmarks.restore(prev)),
+                              action: SnackBarAction(
+                                  label: 'Undo',
+                                  onPressed: () => bookmarks.restore(prev)),
                             ),
                           );
                       },
@@ -377,24 +504,25 @@ class NewsPageState extends State<NewsPage> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
                             child: Row(
-                              children: [Icon(Icons.fiber_new, size: 18), SizedBox(width: 6), Text('New since last visit')],
+                              children: [
+                                Icon(Icons.fiber_new, size: 18),
+                                SizedBox(width: 6),
+                                Text('New since last visit')
+                              ],
                             ),
                           ),
                           tile,
                         ],
                       );
                     }
-
                     return tile;
                   },
                 ),
               ),
             );
-
-
-
           } else {
             // GRID view
             // GRID
@@ -404,9 +532,14 @@ class NewsPageState extends State<NewsPage> {
                 child: LayoutBuilder(
                   builder: (context, cons) {
                     final w = cons.maxWidth;
-                    final cross = w > 900 ? 4 : w > 600 ? 3 : 2;
+                    final cross = w > 900
+                        ? 4
+                        : w > 600
+                            ? 3
+                            : 2;
                     final pad = _density == NewsDensity.compact ? 6.0 : 10.0;
-                    final childAspect = _density == NewsDensity.compact ? 0.85 : 0.75;
+                    final childAspect =
+                        _density == NewsDensity.compact ? 0.85 : 0.75;
 
                     return GridView.builder(
                       controller: _sc,
@@ -421,7 +554,8 @@ class NewsPageState extends State<NewsPage> {
                       itemBuilder: (context, i) {
                         final a = items[i];
                         return _CardTile(
-                          key: ValueKey('card_${a.id}'), // now accepted
+                          key: ValueKey('card_${a.id}'),
+                          // now accepted
                           article: a,
                           lowData: _lowData,
                           density: _density,
@@ -434,8 +568,11 @@ class NewsPageState extends State<NewsPage> {
                               ..hideCurrentSnackBar()
                               ..showSnackBar(
                                 SnackBar(
-                                  content: Text(nowBm ? 'Bookmarked' : 'Removed'),
-                                  action: SnackBarAction(label: 'Undo', onPressed: () => bookmarks.restore(prev)),
+                                  content:
+                                      Text(nowBm ? 'Bookmarked' : 'Removed'),
+                                  action: SnackBarAction(
+                                      label: 'Undo',
+                                      onPressed: () => bookmarks.restore(prev)),
                                 ),
                               );
                           },
@@ -447,9 +584,6 @@ class NewsPageState extends State<NewsPage> {
                 ),
               ),
             );
-
-
-
           }
         },
       ),
@@ -468,9 +602,12 @@ class _FiltersResult {
   final int days;
   final int topicIndex;
   final int sourceIndex;
-  const _FiltersResult({required this.days, required this.topicIndex, required this.sourceIndex});
-}
 
+  const _FiltersResult(
+      {required this.days,
+      required this.topicIndex,
+      required this.sourceIndex});
+}
 
 class _ArticleTileSimple extends StatelessWidget {
   final SpaceflightArticle article;
@@ -481,14 +618,14 @@ class _ArticleTileSimple extends StatelessWidget {
   final VoidCallback onOpen;
 
   const _ArticleTileSimple({
-    Key? key,
+    super.key,
     required this.article,
     required this.density,
     required this.lowData,
     required this.isBookmarked,
     required this.onToggleBookmark,
     required this.onOpen,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -539,14 +676,14 @@ class _CardTile extends StatelessWidget {
   final VoidCallback onOpen;
 
   const _CardTile({
-    Key? key,
+    super.key,
     required this.article,
     required this.lowData,
     required this.density,
     required this.isBookmarked,
     required this.onBookmarkToggle,
     required this.onOpen,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -563,17 +700,17 @@ class _CardTile extends StatelessWidget {
           children: [
             AspectRatio(
               aspectRatio: 16 / 9,
-              child: _Thumb(
-                  url: article.imageUrl,
-                  lowData: lowData,
-                  size: 200),
+              child: _Thumb(url: article.imageUrl, lowData: lowData, size: 200),
             ),
             Padding(
               padding: EdgeInsets.all(pad),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(article.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: titleStyle),
+                  Text(article.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: titleStyle),
                   const SizedBox(height: 6),
                   Text(
                     article.summary,
@@ -591,9 +728,12 @@ class _CardTile extends StatelessWidget {
                         ),
                       ),
                       IconButton(
-                        icon: Icon(isBookmarked ? Icons.bookmark : Icons.bookmark_border),
+                        icon: Icon(isBookmarked
+                            ? Icons.bookmark
+                            : Icons.bookmark_border),
                         onPressed: onBookmarkToggle,
-                        tooltip: isBookmarked ? 'Remove bookmark' : 'Add bookmark',
+                        tooltip:
+                            isBookmarked ? 'Remove bookmark' : 'Add bookmark',
                       ),
                     ],
                   ),
@@ -617,22 +757,25 @@ class _Thumb extends StatelessWidget {
   Widget build(BuildContext context) {
     final image = url.isEmpty
         ? const DecoratedBox(
-      decoration: BoxDecoration(color: Colors.black12),
-      child: Center(child: Icon(Icons.image_not_supported_outlined)),
-    )
+            decoration: BoxDecoration(color: Colors.black12),
+            child: Center(child: Icon(Icons.image_not_supported_outlined)),
+          )
         : CachedNetworkImage(
-      imageUrl: url,
-      fit: BoxFit.cover,
-      // keep this modest; don't over-optimize
-      memCacheWidth: lowData ? 300 : null,
-      placeholder: (c, u) => const Center(
-        child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-      ),
-      errorWidget: (c, u, e) => const DecoratedBox(
-        decoration: BoxDecoration(color: Colors.black12),
-        child: Center(child: Icon(Icons.broken_image_outlined)),
-      ),
-    );
+            imageUrl: url,
+            fit: BoxFit.cover,
+            // keep this modest; don't over-optimize
+            memCacheWidth: lowData ? 300 : null,
+            placeholder: (c, u) => const Center(
+              child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+            errorWidget: (c, u, e) => const DecoratedBox(
+              decoration: BoxDecoration(color: Colors.black12),
+              child: Center(child: Icon(Icons.broken_image_outlined)),
+            ),
+          );
 
     final clipped = ClipRRect(
       borderRadius: BorderRadius.circular(8),
@@ -653,11 +796,17 @@ class _SkeletonTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: Container(width: 72, height: 72, color: Colors.black12),
-      title: Container(height: 14, color: Colors.black12, margin: const EdgeInsets.only(right: 50, bottom: 8)),
+      title: Container(
+          height: 14,
+          color: Colors.black12,
+          margin: const EdgeInsets.only(right: 50, bottom: 8)),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(height: 12, color: Colors.black12, margin: const EdgeInsets.only(bottom: 6)),
+          Container(
+              height: 12,
+              color: Colors.black12,
+              margin: const EdgeInsets.only(bottom: 6)),
           Container(height: 12, width: 120, color: Colors.black12),
         ],
       ),
