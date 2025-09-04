@@ -170,14 +170,54 @@ class NewsPageState extends State<NewsPage> {
     }
     return null;
   }
+// TODO Fix the layout of toolbar
+  Widget _buildToolbar(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            onPressed: _openFiltersSheet,
+            tooltip: 'Filters',
+          ),
+          const SizedBox(width: 8),
+          // Växla List/Grid
+          SegmentedButton<NewsViewMode>(
+            segments: const [
+              ButtonSegment(
+                  value: NewsViewMode.list,
+                  label: Text('List'),
+                  icon: Icon(Icons.view_list)),
+              ButtonSegment(
+                  value: NewsViewMode.grid,
+                  label: Text('Grid'),
+                  icon: Icon(Icons.grid_view)),
+            ],
+            selected: <NewsViewMode>{_view},
+            onSelectionChanged: (s) => setState(() => _view = s.first),
+          ),
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _applyAll,
+            tooltip: 'Reload',
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _openFiltersSheet() async {
     final result = await showCupertinoModalBottomSheet<_FiltersResult>(
       context: context,
-      expand: false, // vi använder egen scroll i innehållet
-      duration: const Duration(milliseconds: 420), // mjukare, lite längre
+      expand: false,
+      // vi använder egen scroll i innehållet
+      duration: const Duration(milliseconds: 420),
+      // mjukare, lite längre
       enableDrag: true,
-      backgroundColor: Colors.transparent,        // för rundade hörn + skugga
+      backgroundColor: Colors.transparent,
+      // för rundade hörn + skugga
       builder: (context) {
         int tmpDays = _days;
         int tmpTopic = _topicIndex;
@@ -199,18 +239,22 @@ class NewsPageState extends State<NewsPage> {
               color: Theme.of(context).colorScheme.surface,
               child: DraggableScrollableSheet(
                 expand: false,
-                initialChildSize: 0.66, // lite högre direkt
+                initialChildSize: 0.75,
+                // lite högre direkt
                 minChildSize: 0.2,
                 maxChildSize: 0.8,
                 builder: (ctx, scrollController) {
                   return StatefulBuilder(
                     builder: (ctx, setSheet) => Padding(
                       padding: EdgeInsets.fromLTRB(
-                        16, 8, 16,
+                        16,
+                        8,
+                        16,
                         16 + MediaQuery.of(ctx).viewInsets.bottom,
                       ),
                       child: ListView(
-                        controller: ModalScrollController.of(context), // integrerad drag/scroll
+                        controller: ModalScrollController.of(context),
+                        // integrerad drag/scroll
                         children: [
                           // Header + Clear all
                           Row(
@@ -228,44 +272,60 @@ class NewsPageState extends State<NewsPage> {
                           ),
                           const SizedBox(height: 12),
 
-                          Text('Time', style: Theme.of(ctx).textTheme.labelLarge),
+                          Text('Time',
+                              style: Theme.of(ctx).textTheme.labelLarge),
                           const SizedBox(height: 6),
                           Wrap(
-                            spacing: 8, runSpacing: 8,
+                            spacing: 8,
+                            runSpacing: 8,
                             children: [
                               for (final c in const [
-                                (0, 'All'), (1, 'Today'), (7, '7 days'), (30, '30 days')
+                                (0, 'All'),
+                                (1, 'Today'),
+                                (7, '7 days'),
+                                (30, '30 days')
                               ])
                                 ChoiceChip(
                                   label: Text(c.$2),
                                   selected: tmpDays == c.$1,
-                                  onSelected: (_) => setSheet(() => tmpDays = c.$1),
+                                  onSelected: (_) =>
+                                      setSheet(() => tmpDays = c.$1),
                                 ),
                             ],
                           ),
 
                           const SizedBox(height: 16),
-                          Text('Topic', style: Theme.of(ctx).textTheme.labelLarge),
+                          Text('Topic',
+                              style: Theme.of(ctx).textTheme.labelLarge),
                           const SizedBox(height: 6),
                           Wrap(
-                            spacing: 8, runSpacing: 8,
-                            children: List.generate(_topics.length, (i) => ChoiceChip(
-                              label: Text(_topics[i]),
-                              selected: tmpTopic == i,
-                              onSelected: (_) => setSheet(() => tmpTopic = i),
-                            )),
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: List.generate(
+                                _topics.length,
+                                (i) => ChoiceChip(
+                                      label: Text(_topics[i]),
+                                      selected: tmpTopic == i,
+                                      onSelected: (_) =>
+                                          setSheet(() => tmpTopic = i),
+                                    )),
                           ),
 
                           const SizedBox(height: 16),
-                          Text('Source', style: Theme.of(ctx).textTheme.labelLarge),
+                          Text('Source',
+                              style: Theme.of(ctx).textTheme.labelLarge),
                           const SizedBox(height: 6),
                           Wrap(
-                            spacing: 8, runSpacing: 8,
-                            children: List.generate(_sources.length, (i) => ChoiceChip(
-                              label: Text(_sources[i]),
-                              selected: tmpSource == i,
-                              onSelected: (_) => setSheet(() => tmpSource = i),
-                            )),
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: List.generate(
+                                _sources.length,
+                                (i) => ChoiceChip(
+                                      label: Text(_sources[i]),
+                                      selected: tmpSource == i,
+                                      onSelected: (_) =>
+                                          setSheet(() => tmpSource = i),
+                                    )),
                           ),
 
                           const SizedBox(height: 16),
@@ -273,11 +333,16 @@ class NewsPageState extends State<NewsPage> {
                             children: [
                               Expanded(
                                 child: OutlinedButton.icon(
-                                  icon: const Icon(Icons.restart_alt),
-                                  label: const Text('Clear All'),
-                                  onPressed: () {
-                                    Navigator.pop(context, const _FiltersResult(days: 0, topicIndex: 0, sourceIndex: 0));                                  }
-                                ),
+                                    icon: const Icon(Icons.restart_alt),
+                                    label: const Text('Clear All'),
+                                    onPressed: () {
+                                      Navigator.pop(
+                                          context,
+                                          const _FiltersResult(
+                                              days: 0,
+                                              topicIndex: 0,
+                                              sourceIndex: 0));
+                                    }),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -335,257 +400,264 @@ class NewsPageState extends State<NewsPage> {
     final merged = Listenable.merge([ctrl, bookmarks]);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Spaceflight News'),
-        actions: [
-          PopupMenuButton<int>(
-            tooltip: 'Options',
-            onSelected: (v) async {
-              switch (v) {
-                case 1: // view
-                  setState(() => _view = (_view == NewsViewMode.list)
-                      ? NewsViewMode.grid
-                      : NewsViewMode.list);
-                  await prefs.saveViewMode(_view);
-                  break;
-                case 2: // density
-                  setState(() => _density =
-                      (_density == NewsDensity.comfortable)
-                          ? NewsDensity.compact
-                          : NewsDensity.comfortable);
-                  await prefs.saveDensity(_density);
-                  break;
-                case 3: // sort
-                  final ns = await showMenu<NewsSort>(
-                    context: context,
-                    position: const RelativeRect.fromLTRB(1000, 80, 16, 0),
-                    items: const [
-                      PopupMenuItem(
-                          value: NewsSort.newest, child: Text('Newest')),
-                      PopupMenuItem(
-                          value: NewsSort.oldest, child: Text('Oldest')),
-                      PopupMenuItem(
-                          value: NewsSort.sourceAZ, child: Text('Source A–Z')),
-                    ],
+        appBar: AppBar(
+          title: const Text('Spaceflight News'),
+          actions: [
+            PopupMenuButton<int>(
+              tooltip: 'Options',
+              onSelected: (v) async {
+                switch (v) {
+                  case 1: // view
+                    setState(() => _view = (_view == NewsViewMode.list)
+                        ? NewsViewMode.grid
+                        : NewsViewMode.list);
+                    await prefs.saveViewMode(_view);
+                    break;
+                  case 2: // density
+                    setState(() => _density =
+                        (_density == NewsDensity.comfortable)
+                            ? NewsDensity.compact
+                            : NewsDensity.comfortable);
+                    await prefs.saveDensity(_density);
+                    break;
+                  case 3: // sort
+                    final ns = await showMenu<NewsSort>(
+                      context: context,
+                      position: const RelativeRect.fromLTRB(1000, 80, 16, 0),
+                      items: const [
+                        PopupMenuItem(
+                            value: NewsSort.newest, child: Text('Newest')),
+                        PopupMenuItem(
+                            value: NewsSort.oldest, child: Text('Oldest')),
+                        PopupMenuItem(
+                            value: NewsSort.sourceAZ,
+                            child: Text('Source A–Z')),
+                      ],
+                    );
+                    if (ns != null) {
+                      setState(() => _sort = ns);
+                      await prefs.saveSort(_sort);
+                    }
+                    break;
+                  case 4: // open in
+                    setState(() => _openInApp = !_openInApp);
+                    await prefs.saveOpenInApp(_openInApp);
+                    break;
+                  case 5: // low data
+                    setState(() => _lowData = !_lowData);
+                    await prefs.saveLowData(_lowData);
+                    break;
+                }
+              },
+              itemBuilder: (c) => [
+                PopupMenuItem(
+                    value: 1,
+                    child: Text(
+                        'View: ${_view == NewsViewMode.list ? 'List' : 'Grid'}')),
+                PopupMenuItem(
+                    value: 2,
+                    child: Text(
+                        'Density: ${_density == NewsDensity.comfortable ? 'Comfortable' : 'Compact'}')),
+                const PopupMenuDivider(),
+                const PopupMenuItem(value: 3, child: Text('Sort…')),
+                PopupMenuItem(
+                    value: 4,
+                    child: Text('Open in ${_openInApp ? 'App' : 'Browser'}')),
+                PopupMenuItem(
+                    value: 5,
+                    child: Text('Low data: ${_lowData ? 'On' : 'Off'}')),
+              ],
+            ),
+          ],
+        ),
+        floatingActionButton: _showFab
+            ? FloatingActionButton.extended(
+                onPressed: scrollToTop,
+                icon: const Icon(Icons.keyboard_arrow_up),
+                label: const Text('Top'),
+              )
+            : null,
+        bottomNavigationBar: AppBottomBar(
+          searchController: _searchCtrl,
+          searchFocusNode: _searchFocus,
+          onSearchSubmitted: (q) => _applyAll(newSearch: q.trim()),
+          onClearSearch: () {
+            _searchCtrl.clear();
+            _applyAll(newSearch: '');
+          },
+          onOpenFilters: _openFiltersSheet,
+          onRefresh: () => _applyAll(),
+        ),
+        body: AnimatedBuilder(
+          animation: merged,
+          builder: (context, _) {
+            // 1) initial loading
+            if (ctrl.loading && ctrl.items.isEmpty) {
+              return ListView.builder(
+                controller: _sc,
+                itemCount: 6,
+                itemBuilder: (_, __) => const _SkeletonTile(),
+              );
+            }
+
+            // 2) compute derived data
+            final items = _sorted(ctrl.items);
+            final firstNew = _firstNewIndex(items);
+
+            // 3) empty state
+            if (items.isEmpty) {
+              return Center(
+                child: TextButton.icon(
+                  onPressed: _applyAll,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('No articles. Tap to retry'),
+                ),
+              );
+            }
+
+            // 4) normal UI
+            return Column(
+              children: [
+                _buildToolbar(context),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: _view == NewsViewMode.list
+                      ? _buildListView(items, firstNew) // see C
+                      : _buildGridView(items), // see C
+                ),
+              ],
+            );
+          },
+        ));
+  }
+
+  Widget _buildListView(List<SpaceflightArticle> items, int? firstNew) {
+    return RefreshIndicator(
+      onRefresh: _applyAll,
+      child: ExcludeSemantics(
+        child: ListView.separated(
+          controller: _sc,
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          itemCount: items.length + (ctrl.exhausted ? 0 : 1),
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            if (index >= items.length) {
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final article = items[index];
+            final isBm = bookmarks.isBookmarked(article.id);
+
+            final tile = _ArticleTileSimple(
+              key: ValueKey('article_${article.id}'),
+              article: article,
+              density: _density,
+              lowData: _lowData,
+              isBookmarked: isBm,
+              onToggleBookmark: () {
+                final prev = bookmarks.snapshot();
+                bookmarks.toggle(article.id);
+                final nowBm = bookmarks.isBookmarked(article.id);
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text(nowBm ? 'Bookmarked' : 'Removed'),
+                      action: SnackBarAction(
+                          label: 'Undo',
+                          onPressed: () => bookmarks.restore(prev)),
+                    ),
                   );
-                  if (ns != null) {
-                    setState(() => _sort = ns);
-                    await prefs.saveSort(_sort);
-                  }
-                  break;
-                case 4: // open in
-                  setState(() => _openInApp = !_openInApp);
-                  await prefs.saveOpenInApp(_openInApp);
-                  break;
-                case 5: // low data
-                  setState(() => _lowData = !_lowData);
-                  await prefs.saveLowData(_lowData);
-                  break;
-              }
-            },
-            itemBuilder: (c) => [
-              PopupMenuItem(
-                  value: 1,
-                  child: Text('View: ${_view == NewsViewMode.list ? 'List' : 'Grid'}')),
-              PopupMenuItem(
-                  value: 2,
-                  child: Text('Density: ${_density == NewsDensity.comfortable
-                          ? 'Comfortable'
-                          : 'Compact'}')),
-              const PopupMenuDivider(),
-              const PopupMenuItem(value: 3, child: Text('Sort…')),
-              PopupMenuItem(
-                  value: 4,
-                  child: Text('Open in ${_openInApp ? 'App' : 'Browser'}')),
-              PopupMenuItem(
-                  value: 5,
-                  child: Text('Low data: ${_lowData ? 'On' : 'Off'}')),
-            ],
-          ),
-        ],
+              },
+              onOpen: () => _onOpenArticle(article),
+            );
+
+            if (firstNew != null && index == firstNew) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.fiber_new, size: 18),
+                        SizedBox(width: 6),
+                        Text('New since last visit'),
+                      ],
+                    ),
+                  ),
+                  tile,
+                ],
+              );
+            }
+            return tile;
+          },
+        ),
       ),
-      floatingActionButton: _showFab
-          ? FloatingActionButton.extended(
-              onPressed: scrollToTop,
-              icon: const Icon(Icons.keyboard_arrow_up),
-              label: const Text('Top'),
-            )
-          : null,
-      bottomNavigationBar: AppBottomBar(
-        searchController: _searchCtrl,
-        searchFocusNode: _searchFocus,
-        onSearchSubmitted: (q) => _applyAll(newSearch: q.trim()),
-        onClearSearch: () {
-          _searchCtrl.clear();
-          _applyAll(newSearch: '');
-        },
-        onOpenFilters: _openFiltersSheet,
-        onRefresh: () => _applyAll(),
-      ),
-      body: AnimatedBuilder(
-        animation: merged,
-        builder: (context, _) {
-          if (ctrl.loading && ctrl.items.isEmpty) {
-            return ListView.builder(
+    );
+  }
+
+  Widget _buildGridView(List<SpaceflightArticle> items) {
+    return RefreshIndicator(
+      onRefresh: _applyAll,
+      child: ExcludeSemantics(
+        child: LayoutBuilder(
+          builder: (context, cons) {
+            final w = cons.maxWidth;
+            final cross = w > 900
+                ? 4
+                : w > 600
+                    ? 3
+                    : 2;
+            final pad = _density == NewsDensity.compact ? 6.0 : 10.0;
+        //    final childAspect = _density == NewsDensity.compact ? 0.78 : 0.85;
+
+
+            final mainExtent = _density == NewsDensity.compact ? 280.0 : 320.0;
+
+            return GridView.builder(
               controller: _sc,
-              itemCount: 6,
-              itemBuilder: (_, __) => const _SkeletonTile(),
-            );
-          }
-
-          var items = _sorted(ctrl.items);
-
-          // New-since divider index
-          final firstNew = _firstNewIndex(items);
-
-          if (items.isEmpty) {
-            return Center(
-              child: TextButton.icon(
-                onPressed: _applyAll,
-                icon: const Icon(Icons.refresh),
-                label: const Text('No articles. Tap to retry'),
+              padding: EdgeInsets.all(pad),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: w > 900 ? 4 : w > 600 ? 3 : 2,
+                mainAxisSpacing: pad,
+                crossAxisSpacing: pad,
+                mainAxisExtent: mainExtent, // ⟵ key line; overrides aspect-based height
               ),
-            );
-          }
-
-          // LIST or GRID
-          if (_view == NewsViewMode.list) {
-            // LIST
-            return RefreshIndicator(
-              onRefresh: _applyAll,
-              child: ExcludeSemantics(
-                // keep this to avoid any remaining semantics churn
-                child: ListView.separated(
-                  controller: _sc,
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  itemCount: items.length + (ctrl.exhausted ? 0 : 1),
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    // loader row
-                    if (index >= items.length) {
-                      return const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Center(child: CircularProgressIndicator()),
+              itemCount: items.length,
+              itemBuilder: (context, i) {
+                final a = items[i];
+                return _CardTile(
+                  key: ValueKey('card_${a.id}'),
+                  article: a,
+                  lowData: _lowData,
+                  density: _density,
+                  isBookmarked: bookmarks.isBookmarked(a.id),
+                  onBookmarkToggle: () {
+                    final prev = bookmarks.snapshot();
+                    bookmarks.toggle(a.id);
+                    final nowBm = bookmarks.isBookmarked(a.id);
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(
+                          content: Text(nowBm ? 'Bookmarked' : 'Removed'),
+                          action: SnackBarAction(
+                              label: 'Undo',
+                              onPressed: () => bookmarks.restore(prev)),
+                        ),
                       );
-                    }
-
-                    final article = items[index];
-                    final isBm = bookmarks.isBookmarked(article.id);
-
-                    final tile = _ArticleTileSimple(
-                      key: ValueKey('article_${article.id}'),
-                      // now accepted
-                      article: article,
-                      density: _density,
-                      lowData: _lowData,
-                      isBookmarked: isBm,
-                      onToggleBookmark: () {
-                        final prev = bookmarks.snapshot();
-                        bookmarks.toggle(article.id);
-                        final nowBm = bookmarks.isBookmarked(article.id);
-                        ScaffoldMessenger.of(context)
-                          ..hideCurrentSnackBar()
-                          ..showSnackBar(
-                            SnackBar(
-                              content: Text(nowBm ? 'Bookmarked' : 'Removed'),
-                              action: SnackBarAction(
-                                  label: 'Undo',
-                                  onPressed: () => bookmarks.restore(prev)),
-                            ),
-                          );
-                      },
-                      onOpen: () => _onOpenArticle(article),
-                    );
-
-                    // Insert "New since last visit" header + the tile
-                    if (firstNew != null && index == firstNew) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            child: Row(
-                              children: [
-                                Icon(Icons.fiber_new, size: 18),
-                                SizedBox(width: 6),
-                                Text('New since last visit')
-                              ],
-                            ),
-                          ),
-                          tile,
-                        ],
-                      );
-                    }
-                    return tile;
                   },
-                ),
-              ),
+                  onOpen: () => _onOpenArticle(a),
+                );
+              },
             );
-          } else {
-            // GRID view
-            // GRID
-            return RefreshIndicator(
-              onRefresh: _applyAll,
-              child: ExcludeSemantics(
-                child: LayoutBuilder(
-                  builder: (context, cons) {
-                    final w = cons.maxWidth;
-                    final cross = w > 900
-                        ? 4
-                        : w > 600
-                            ? 3
-                            : 2;
-                    final pad = _density == NewsDensity.compact ? 6.0 : 10.0;
-                    final childAspect =
-                        _density == NewsDensity.compact ? 0.85 : 0.75;
-
-                    return GridView.builder(
-                      controller: _sc,
-                      padding: EdgeInsets.all(pad),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: cross,
-                        mainAxisSpacing: pad,
-                        crossAxisSpacing: pad,
-                        childAspectRatio: childAspect,
-                      ),
-                      itemCount: items.length,
-                      itemBuilder: (context, i) {
-                        final a = items[i];
-                        return _CardTile(
-                          key: ValueKey('card_${a.id}'),
-                          // now accepted
-                          article: a,
-                          lowData: _lowData,
-                          density: _density,
-                          isBookmarked: bookmarks.isBookmarked(a.id),
-                          onBookmarkToggle: () {
-                            final prev = bookmarks.snapshot();
-                            bookmarks.toggle(a.id);
-                            final nowBm = bookmarks.isBookmarked(a.id);
-                            ScaffoldMessenger.of(context)
-                              ..hideCurrentSnackBar()
-                              ..showSnackBar(
-                                SnackBar(
-                                  content:
-                                      Text(nowBm ? 'Bookmarked' : 'Removed'),
-                                  action: SnackBarAction(
-                                      label: 'Undo',
-                                      onPressed: () => bookmarks.restore(prev)),
-                                ),
-                              );
-                          },
-                          onOpen: () => _onOpenArticle(a),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-            );
-          }
-        },
+          },
+        ),
       ),
     );
   }
@@ -638,7 +710,7 @@ class _ArticleTileSimple extends StatelessWidget {
       leading: _Thumb(
         url: article.imageUrl,
         lowData: lowData,
-        size: density == NewsDensity.compact ? 60 : 72,
+        size: density == NewsDensity.compact ? 56 : 72,
       ),
       title: Text(article.title, maxLines: 2, overflow: TextOverflow.ellipsis),
       subtitle: Column(
@@ -688,6 +760,8 @@ class _CardTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pad = density == NewsDensity.compact ? 8.0 : 12.0;
+    final gap1 = density == NewsDensity.compact ? 4.0 : 6.0; // title→summary
+    final gap2 = density == NewsDensity.compact ? 6.0 : 8.0; // summary→meta
     final titleStyle = Theme.of(context).textTheme.titleSmall;
     final subtitleStyle = Theme.of(context).textTheme.bodySmall;
 
@@ -696,6 +770,7 @@ class _CardTile extends StatelessWidget {
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: Column(
+          mainAxisSize: MainAxisSize.min, // plays well with mainAxisExtent
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AspectRatio(
@@ -705,35 +780,40 @@ class _CardTile extends StatelessWidget {
             Padding(
               padding: EdgeInsets.all(pad),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(article.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: titleStyle),
-                  const SizedBox(height: 6),
+                  Text(
+                    article.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: titleStyle,
+                  ),
+                  SizedBox(height: gap1),
                   Text(
                     article.summary,
                     maxLines: density == NewsDensity.compact ? 2 : 3,
                     overflow: TextOverflow.ellipsis,
                     style: subtitleStyle,
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: gap2),
                   Row(
                     children: [
                       Expanded(
                         child: Text(
                           '${article.newsSite} • ${timeago.format(article.publishedAt, allowFromNow: true)}',
                           style: subtitleStyle,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       IconButton(
-                        icon: Icon(isBookmarked
-                            ? Icons.bookmark
-                            : Icons.bookmark_border),
+                        icon: Icon(isBookmarked ? Icons.bookmark : Icons.bookmark_border),
                         onPressed: onBookmarkToggle,
-                        tooltip:
-                            isBookmarked ? 'Remove bookmark' : 'Add bookmark',
+                        tooltip: isBookmarked ? 'Remove bookmark' : 'Add bookmark',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+                        visualDensity: VisualDensity.compact,
+                        iconSize: 20,
                       ),
                     ],
                   ),
@@ -747,7 +827,8 @@ class _CardTile extends StatelessWidget {
   }
 }
 
-class _Thumb extends StatelessWidget {
+
+    class _Thumb extends StatelessWidget {
   final String url;
   final bool lowData;
   final double? size; // <-- optional now
