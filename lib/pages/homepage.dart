@@ -1,13 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:neows_app/pages/settings_page.dart';
-import 'package:neows_app/pages/acknowledgements_page.dart';
-import 'package:neows_app/model/asteroid_csv.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'dart:math';
 
-import 'package:neows_app/pages/news_page.dart';
-import 'package:neows_app/service/news_repository.dart';
-import 'package:neows_app/service/spaceflight_news_service.dart';
+import 'package:flutter/material.dart';
+import 'package:neows_app/widget/orbit_thumb.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -16,9 +10,11 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Hemsida")),
+      appBar: AppBar(title: const Text("Homepage")),
       drawer: Drawer(
-        backgroundColor: Colors.deepOrangeAccent[100],
+        backgroundColor: Colors.deepPurpleAccent,
+        elevation: 100,
+        shadowColor: Colors.black54,
         child: Column(
           children: [
             DrawerHeader(
@@ -51,14 +47,14 @@ class HomePage extends StatelessWidget {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, "/orbit_page");
               },
-            ),  ListTile(
+            ), ListTile(
               leading: const Icon(Icons.info),
               title: const Text("acknowledgements"),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, "/acknowledgements_page");
               },
-            ),    ListTile(
+            ), ListTile(
               leading: const Icon(Icons.settings),
               title: const Text("Settings"),
               onTap: () {
@@ -68,18 +64,33 @@ class HomePage extends StatelessWidget {
             ),
           ],
         ),
-      ),   body: ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          child: SvgPicture.asset(
-            'lib/assets/images/NASA_Worm_logo.svg',
-         //   'lib/assets/images/icon/icon1.png',
-            width: 200,
-            height: 200,
+      ),
+      body: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          children: [
+           ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: OrbitThumb(
+              asteroidA: 1.6,
+              asteroidE: 0.35,
+              asteroidPeriod: const Duration(seconds: 12),
+              inclinationDeg: 15,
+              showApsides: true,
+              showMoon: true,
+              showParallaxStars: true,
+              cometTail: true,
+              showInfoChip: true,
+              objectName: '2010 PK9',
+              showAsteroidLabel: true,
+              speedScale: 0.0,
+              enableScrub: true,
+              heroTag: 'orbit-thumb-2010PK9',
+              onTap: () {
+                // Navigate to details or full orbit view
+           //     Navigator.pushNamed(context, "/orbit_page");
+              },
+            ),
           ),
-        ),
         const SizedBox(height: 40),
         ElevatedButton(
           child: const Text("Sök Asteroider med NeoWs och MPC"),
@@ -123,8 +134,8 @@ class HomePage extends StatelessWidget {
             Navigator.pushNamed(context, "/OrbitWebViewPage");
           },
         ),
-      ],
-    ),
+        ],
+      ),
     );
   }
 }
