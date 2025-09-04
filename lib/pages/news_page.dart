@@ -35,6 +35,7 @@ class NewsPageState extends State<NewsPage> {
 
   final _searchCtrl = TextEditingController();
   final _searchFocus = FocusNode();
+  bool _bookmarksOnly = false;
 
   // Bookmarks
   late final BookmarksController bookmarks =
@@ -199,10 +200,12 @@ class NewsPageState extends State<NewsPage> {
           ),
           const Spacer(),
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _applyAll,
-            tooltip: 'Reload',
-          ),
+            icon:  Icon(_bookmarksOnly ? Icons.bookmarks_outlined : Icons.bookmarks),
+            tooltip: _bookmarksOnly ? 'showing bookmarks' : 'Show bookmarks',
+            onPressed: () => setState(() => _bookmarksOnly = !_bookmarksOnly
+    ),
+    ),
+
         ],
       ),
     );
@@ -500,14 +503,23 @@ class NewsPageState extends State<NewsPage> {
               );
             }
 
-            // 2) compute derived data
-            final items = _sorted(ctrl.items);
-            final firstNew = _firstNewIndex(items);
+            // 2) derive & filter
+            var items = _sorted(ctrl.items);
+            if (_bookmarksOnly) {
+              items = items.where((a) => bookmarks.isBookmarked(a.id)).toList();
+            }
+            final int? firstNew = _bookmarksOnly ? null : _firstNewIndex(items);
 
             // 3) empty state
             if (items.isEmpty) {
               return Center(
-                child: TextButton.icon(
+                child: _bookmarksOnly
+                    ? TextButton.icon(
+                  onPressed: () => setState(() => _bookmarksOnly = false),
+                  icon: const Icon(Icons.bookmark_border),
+                  label: const Text('No bookmarks yet. Show all'),
+                )
+                    : TextButton.icon(
                   onPressed: _applyAll,
                   icon: const Icon(Icons.refresh),
                   label: const Text('No articles. Tap to retry'),
@@ -522,14 +534,15 @@ class NewsPageState extends State<NewsPage> {
                 const SizedBox(height: 8),
                 Expanded(
                   child: _view == NewsViewMode.list
-                      ? _buildListView(items, firstNew) // see C
-                      : _buildGridView(items), // see C
+                      ? _buildListView(items, firstNew)
+                      : _buildGridView(items),
                 ),
               ],
             );
           },
-        ));
-  }
+        ),
+    );
+        }
 
   Widget _buildListView(List<SpaceflightArticle> items, int? firstNew) {
     return RefreshIndicator(
