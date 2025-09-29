@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 // Services + mappers
 import 'package:neows_app/service/neoWs_service.dart';
-import 'package:neows_app/service/asterank_api_service.dart';
+import 'package:neows_app/service/asterank_api_service.dart' show AsterankApiService, AsterankObject;
 import 'package:neows_app/mappers/asteroid_mappers.dart';
 import 'package:neows_app/search/asteroid_filters.dart';
 import 'package:neows_app/search/asteroid_filter_sheet.dart';
@@ -14,27 +14,34 @@ import 'package:neows_app/widget/asteroid_card.dart';
 // Envied key
 import 'package:neows_app/env/env.dart';
 
-// ----- Source selector -----
-enum ApiSource { neows, mpcOnline }
+import 'package:neows_app/service/asteroid_filtering.dart'; // applyFilters + SortKey
+import 'package:neows_app/utils/num_utils.dart';// toDouble/toStr if you need them here
 
-extension ApiSourceX on ApiSource {
-  String get label => switch (this) {
-    ApiSource.neows => 'NeoWs',
-    ApiSource.mpcOnline => 'MPC',
-  };
-  bool get supportsDate => this == ApiSource.neows;
-}
+import 'package:neows_app/service/source_caps.dart';          // NEW
 
 class AsteroidSearchPage extends StatefulWidget {
   const AsteroidSearchPage({super.key});
   @override
   State<AsteroidSearchPage> createState() => _AsteroidSearchPageState();
 }
+class _ResultCache {
+  final _m = <String, List<Asteroid>>{};
+  String _k(ApiSource s, String t, int l) => '${s.name}|$t|$l';
+  List<Asteroid>? get(ApiSource s, String t, int l) => _m[_k(s, t, l)];
+  void put(ApiSource s, String t, int l, List<Asteroid> v) => _m[_k(s, t, l)] = v;
+}
+
 
 class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
   // Services
   late final NeoWsService _neo;
-  late final AsterankApiService _mpcOnline;
+  late final AsterankApiService _asterank;
+final _cache = _ResultCache();
+
+  // cancel stale searches
+  int _reqId = 0;
+
+
 
   // User options
   ApiSource _source = ApiSource.neows;
@@ -43,6 +50,7 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
 
   // Filters + search
   AsteroidFilters _filters = AsteroidFilters();
+
 
   // UI/data state
   String _query = '';
@@ -60,7 +68,7 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
   void initState() {
     super.initState();
     _neo = NeoWsService(Env.nasaApiKey);
-    _mpcOnline = AsterankApiService(enableLogs: true);
+    _asterank = AsterankApiService(enableLogs: true);
     _dispatchSearch(currentTerm: '');
   }
 
@@ -69,111 +77,27 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
     _debounce?.cancel();
     super.dispose();
   }
-  List<Asteroid> _applyClientFilters(List<Asteroid> list, AsteroidFilters f) {
-    double? _mToKm(double? m) => m == null ? null : m / 1000.0;
-
-    bool _useRange(DoubleRange? r, double fullMin, double fullMax) {
-      if (r == null) return false;
-      final min = r.min ?? fullMin;
-      final max = r.max ?? fullMax;
-      // If the slider spans the full range, treat it as OFF
-      return !(min <= fullMin && max >= fullMax);
-    }
-
-    final nameQuery = (f.query ?? _query).trim().toLowerCase();
-    final useDiam = _useRange(f.diameterM, 0, FilterBounds.diamMaxM);
-    final useH    = _useRange(f.hMag,      FilterBounds.hMin, FilterBounds.hMax);
-    final useE    = _useRange(f.e,         0,                 FilterBounds.eMax);
-    final useA    = _useRange(f.aAu,       0,                 FilterBounds.aMax);
-    final useI    = _useRange(f.iDeg,      0,                 FilterBounds.iMax);
-
-    final diamMinKm = _mToKm(f.diameterM?.min);
-    final diamMaxKm = _mToKm(f.diameterM?.max);
-
-    bool _inRange(double v, double? min, double? max) {
-      if (min != null && v < min) return false;
-      if (max != null && v > max) return false;
-      return true;
-    }
-
-    double? _getH(Asteroid a) {
-      try { return (a as dynamic).H as double?; } catch (_) { return null; }
-    }
-
-    bool _matchText(Asteroid a) {
-      if (nameQuery.isEmpty) return true;
-      final n1 = a.name.toLowerCase();
-      final n2 = a.fullName.toLowerCase();
-      return n1.contains(nameQuery) || n2.contains(nameQuery);
-    }
-
-    bool _isPha(Asteroid a) {
-      final v = a.pha.toString().toLowerCase();
-      return v == 'y' || v == 'true' || v == 'yes' || v == '1';
-    }
-
-    return list.where((a) {
-      if (!_matchText(a)) return false;
-
-      if (f.phaOnly && !_isPha(a)) return false;
-
-      // Diameter (slider is meters → convert to km for model)
-      if (useDiam) {
-        if (!(_inRange(a.diameter, diamMinKm, diamMaxKm))) return false;
-      }
-
-      if (useH) {
-        final h = _getH(a);
-        if (h == null) return false;
-        if (!_inRange(h, f.hMag!.min, f.hMag!.max)) return false;
-      }
-
-      if (useI) {
-        final inc = a.i;
-        // Only enforce if we actually have a value; 0.0 = unknown from NeoWs feed
-        if (inc != 0.0 && !_inRange(inc, f.iDeg!.min, f.iDeg!.max)) return false;
-      }
-
-      if (useE) {
-        final ecc = a.e;
-        if (ecc != 0.0 && !_inRange(ecc, f.e!.min, f.e!.max)) return false;
-      }
-
-      if (useA) {
-        final sma = a.a;
-        if (sma != 0.0 && !_inRange(sma, f.aAu!.min, f.aAu!.max)) return false;
-      }
-
-      if (f.maxMoidAu != null && a.moid > f.maxMoidAu!) return false;
-
-      if (useE && !_inRange(a.e, f.e!.min, f.e!.max)) return false;
-      if (useA && !_inRange(a.a, f.aAu!.min, f.aAu!.max)) return false;
-      if (useI && !_inRange(a.i, f.iDeg!.min, f.iDeg!.max)) return false;
-
-      // Close-approach filters skipped (not in your model yet)
-      return true;
-    }).toList(growable: false);
-  }
-
 
   Future<void> _openFilters() async {
-    final supportsCA = _source == ApiSource.neows;
+    final caps = _source.caps; // alias
     final picked = await showModalBottomSheet<AsteroidFilters>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (_) => AsteroidFilterSheet(
         initial: _filters.copyWith(query: _query),
-        supportsCloseApproach: supportsCA,
+        supportsCloseApproach: caps.supportsCloseApproach,
+        supportsDateWindow:   caps.supportsDateWindow,
+        supportsHazardFlag:   caps.supportsHazardFlag,
       ),
     );
+
+
     if (picked != null) {
       setState(() {
         _filters = picked;
-        _query = picked.query ?? _query;
-        if (supportsCA && picked.window != null) {
-          _neoRange = picked.window; // use selected window for /feed
-        }
+        _query = picked.query;
+        _neoRange = _source.caps.supportsDateWindow ? picked.window : null;
       });
       _dispatchSearch(currentTerm: _query);
     }
@@ -188,15 +112,10 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
     });
   }
 
-  // Orbit lazy enrichment
   Future<void> _ensureOrbit(Asteroid ast) async {
     if (ast.a > 0 && ast.e > 0) return;
-    if (_orbitCache.containsKey(ast.id)) {
-      if (mounted) setState(() {});
-      return;
-    }
-    if (_orbitLoading.contains(ast.id) || _orbitActive >= _orbitMaxConcurrent)
-      return;
+    if (_orbitCache.containsKey(ast.id)) { if (mounted) setState(() {}); return; }
+    if (_orbitLoading.contains(ast.id) || _orbitActive >= _orbitMaxConcurrent) return;
 
     final term = (ast.fullName.isNotEmpty ? ast.fullName : ast.name).trim();
     if (term.isEmpty) return;
@@ -204,95 +123,149 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
     _orbitLoading.add(ast.id);
     _orbitActive++;
     try {
-      // 2) Online fallback
-      try {
-        final on = await _mpcOnline.searchMany(term, limit: 1);
-        if (on.isNotEmpty) {
-          final a = on.first.a;
-          final e = on.first.e;
-          final i = on.first.i;
+      // 1) If current source is NeoWs and details endpoint exists, try it first
+      if (_source == ApiSource.neows) {
+        try {
+
+          final d = await _neo.fetchDetailsByNameOrId(term); // implement if not present
+          final a = d.a, e = d.e, i = d.i;
           if (a != null && a > 0 && e != null && e > 0) {
             _orbitCache[ast.id] = (a: a, e: e, i: i);
             if (mounted) setState(() {});
+            return;
           }
+        } catch (_) {}
+      }
+
+      // 2) Fallback: Asterank objects
+      final rows = await _asterank.search(term, limit: 1);
+      if (rows.isNotEmpty) {
+        final o = rows.first;
+        final a = o.a, e = o.e, i = o.i;
+        if (a != null && a > 0 && e != null && e > 0) {
+          _orbitCache[ast.id] = (a: a, e: e, i: i);
+          if (mounted) setState(() {});
         }
-      } catch (e) {
-        debugPrint('Online MPC orbit fetch failed: $e');
       }
     } finally {
       _orbitLoading.remove(ast.id);
-      _orbitActive = math.max(0, _orbitActive - 1); // keep int
+      _orbitActive = math.max(0, _orbitActive - 1);
     }
   }
 
 
   Future<void> _dispatchSearch({required String currentTerm}) async {
+    final int myId = ++_reqId;                  // take a ticket for cancellation
     setState(() => _loading = true);
-    try {
-      final lim = _limit.clamp(10, 1000);
-      List<Asteroid> out = [];
 
+    try {
+      final int lim = _limit.clamp(10, 1000);
+      final f = _filters;
+      final String term = (f.query.isNotEmpty ? f.query : currentTerm).trim();
+      // 1) Cache check (instant UI if same query/limit/source)
+      final cached = _cache.get(_source, term, lim);
+      if (cached != null) {
+        if (myId != _reqId) return;
+        setState(() {
+          _filtered = cached;
+          _loading = false;
+        });
+        return;
+      }
+
+      // 2) Fetch per source
+      List<Asteroid> out = [];
       switch (_source) {
         case ApiSource.neows: {
-          final now = DateTime.now();
-          final picked = _neoRange ?? DateTimeRange(start: now, end: now.add(const Duration(days: 6)));
-          final rows = await _neo.feed(picked, lim);
-          out = rows.map(asteroidFromNeowsMap).toList();
+          final bool hasQuery = term.isNotEmpty;
+          if (_source.caps.supportsDateWindow && !hasQuery) {
+            final now = DateTime.now();
+            final picked = f.window ?? DateTimeRange(
+              start: now,
+              end: now.add(const Duration(days: 6)),
+            );
+            final rows = await _neo.feed(picked, lim);
+            out = rows.map<Asteroid>(asteroidFromNeowsMap).toList();
+          } else {
+            final rows = await _neo.search(term, limit: lim);
+            out = rows.map<Asteroid>(asteroidFromNeowsMap).toList();
+          }
           break;
         }
-        case ApiSource.mpcOnline: {
-          if (currentTerm.isEmpty) {
-            final tops = await _mpcOnline.fetchTop(limit: lim);
-            out = tops.map(_asteroidFromMpcRow).toList();
+
+        case ApiSource.asterank: {
+          if (term.isEmpty) {
+            final rows = await _asterank.fetchTop(limit: lim);
+            out = rows.map<Asteroid>(_asteroidFromAsterank).toList();
           } else {
-            final rows = await _mpcOnline.searchMany(currentTerm, limit: lim);
-            out = rows.map(_asteroidFromMpcRow).toList();
+            final rows = await _asterank.search(term, limit: lim);
+            out = rows.map<Asteroid>(_asteroidFromAsterank).toList();
           }
           break;
         }
       }
 
-      // 👇 Apply UI filters *after* fetching
-      out = _applyClientFilters(out, _filters);
+      // 3) Client-side filter/sort
+      out = out.applyFilters(f, sortKey: SortKey.size, descending: true);
 
+      // 4) Save to cache before updating UI
+      _cache.put(_source, term, lim, out);
+
+      if (myId != _reqId) return;               // drop stale results
       setState(() => _filtered = out);
     } catch (e) {
+      if (myId != _reqId) return;
       debugPrint('Dispatch error: $e');
       setState(() => _filtered = []);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && myId == _reqId) {
+        setState(() => _loading = false);
+      }
     }
   }
 
-  // MpcRow -> Asteroid adapter
-  Asteroid _asteroidFromMpcRow(MpcRow r) {
-    final display = (r.readableDes ?? r.des ?? 'Unknown');
+
+
+
+// AsterankObject -> Asteroid adapter
+  Asteroid _asteroidFromAsterank(AsterankObject o) {
+    final display = o.title.isNotEmpty ? o.title : o.id;
     return Asteroid(
-      id: r.des ?? display,
+      id: o.id,
       name: display,
       fullName: display,
-      diameter: 0.0,
-      albedo: 0.0,
-      neo: 'unknown',
-      pha: 'unknown',
+      diameter: o.diameter ?? 0.0,
+      albedo: o.albedo ?? 0.0,
+      neo: (o.neo == true) ? 'Y' : 'N',
+      pha: 'unknown',   // /api/asterank doesn’t expose PHA reliably
       rotationPeriod: 0.0,
-      classType: 'MPC',
+      classType: 'Asterank',
       orbitId: 0,
-      moid: r.moid ?? 0.0,
-      a: r.a ?? 0.0,
-      e: r.e ?? 0.0,
-      i: r.i ?? 0.0,
+      moid: 0.0,        /// not provided by /api/asterank
+      a: o.a ?? 0.0,
+      e: o.e ?? 0.0,
+      i: o.i ?? 0.0,
     );
   }
 
+
   String getDangerLevel(Asteroid a) {
-    final isPha = a.pha.toUpperCase() == 'Y';
-    final moidRisk = a.moid < 0.05; // au
-    final bigEnough = a.diameter >= 0.14; // km (~140m)
-    if ((isPha || moidRisk) && bigEnough) return 'Danger🔥';
-    if (isPha || moidRisk) return 'Moderate⚠️';
-    return 'Safe✅';
+    // NeoWs case: you might have pha + moid
+    final pha = a.pha.toUpperCase() == 'Y';
+    final moidKnown = a.moid > 0;
+    final moidRisk = moidKnown && a.moid < 0.05; // au
+    final big = a.diameter >= 0.14;
+
+    if (pha && (big || moidRisk)) return 'Danger🔥';
+    if (pha || moidRisk) return 'Moderate⚠️';
+
+    // Asterank fallback: no PHA/MOID; show NEO tag if sizable
+    final isNeo = a.neo.toUpperCase() == 'Y';
+    if (isNeo && big) return 'NEO⚠️';
+    if (isNeo) return 'NEO';
+    return '—';
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -322,15 +295,15 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
                       ButtonSegment(
                           value: ApiSource.neows, label: Text('NeoWs')),
                       ButtonSegment(
-                          value: ApiSource.mpcOnline, label: Text('MPC')),
-
+                          value: ApiSource.asterank, label: Text('Asterank')),
                     ],
                     selected: {_source},
                     showSelectedIcon: false,
                     onSelectionChanged: (sel) {
                       setState(() {
                         _source = sel.first;
-                        if (!_source.supportsDate) _neoRange = null;
+                        final caps = _source.caps;
+                        if (!caps.supportsDateWindow) _neoRange = null;
                       });
                       _dispatchSearch(currentTerm: _query);
                     },
@@ -416,9 +389,14 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
                 final orbitI = cached?.i ??
                     (asteroid.i > 0 ? asteroid.i : null);
                 final hasOrbit = (orbitA != null && orbitE != null && orbitI != null);
-                if (!hasOrbit) _ensureOrbit(asteroid);
+                if (!hasOrbit) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _ensureOrbit(asteroid);
+                  });
+                }
 
                 return AsteroidCard(
+                  key: ValueKey(asteroid.id),
                   a: asteroid,
                   dangerLevel: getDangerLevel,
                   isLoadingAsterank: false,
@@ -450,23 +428,55 @@ class _ActiveFilterSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final chips = <Widget>[];
     if (f.phaOnly) chips.add(const Chip(label: Text('PHA')));
-    if (f.maxMissDistanceKm != null) chips.add(Chip(label: Text('≤ ${f.maxMissDistanceKm!.round()} km')));
+
+
     if (f.targetBody != null) chips.add(Chip(label: Text(f.targetBody!)));
-    if (f.hMag?.isSet == true) chips.add(Chip(label: Text('H ${f.hMag!.min?.toStringAsFixed(1) ?? ""}-${f.hMag!.max?.toStringAsFixed(1) ?? ""}')));
-    if (f.diameterM?.isSet == true) chips.add(Chip(label: Text('Ø ${f.diameterM!.min?.round() ?? 0}-${f.diameterM!.max?.round() ?? 0} m')));
-    if (f.orbitClasses.isNotEmpty) chips.add(Chip(label: Text(f.orbitClasses.join('·'))));
-    if (f.window != null) {
-      chips.add(Chip(label: Text(
-        '${f.window!.start.toIso8601String().split("T").first}→${f.window!.end.toIso8601String().split("T").first}',
-      )));
+
+    // H-magnitude not in your model; only show if your filter UI uses it intentionally
+    if (f.hMag?.isSet == true) {
+      chips.add(Chip(label: Text('H ${f.hMag!.min?.toStringAsFixed(1) ?? ""}-${f.hMag!.max?.toStringAsFixed(1) ?? ""}')));
     }
+
+
+    if (f.diameterKm?.isSet == true) {
+      final minTxt = f.diameterKm!.min?.toStringAsFixed(2) ?? '';
+      final maxTxt = f.diameterKm!.max?.toStringAsFixed(2) ?? '';
+      chips.add(Chip(label: Text('Ø $minTxt–$maxTxt km')));
+    }
+
+
+    // Orbit classes (if used)
+    if (f.orbitClasses.isNotEmpty) {
+      chips.add(Chip(label: Text(f.orbitClasses.join('·'))));
+    }
+
+    // Window (NeoWs)
+    if (f.window != null) {
+      chips.add(Chip(
+        label: Text(
+          '${f.window!.start.toIso8601String().split("T").first} → ${f.window!.end.toIso8601String().split("T").first}',
+        ),
+      ));
+    }
+
+    // MOID (use range if present; else show single max)
+    if (f.moidAu?.isSet == true) {
+      final minTxt = f.moidAu!.min?.toStringAsFixed(3) ?? '';
+      final maxTxt = f.moidAu!.max?.toStringAsFixed(3) ?? '';
+      chips.add(Chip(label: Text('MOID $minTxt–$maxTxt au')));
+    } else if (f.maxMoidAu != null) {
+      chips.add(Chip(label: Text('MOID ≤ ${f.maxMoidAu!.toStringAsFixed(3)} au')));
+    }
+
     if (chips.isEmpty) return const SizedBox.shrink();
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: Row(children: chips.map((c) => Padding(
-        padding: const EdgeInsets.only(right: 6),
-        child: c,
-      )).toList()),
+      child: Row(
+        children: chips
+            .map((c) => Padding(padding: const EdgeInsets.only(right: 6), child: c))
+            .toList(),
+      ),
     );
   }
 }
+

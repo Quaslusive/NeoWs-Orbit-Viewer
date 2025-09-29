@@ -13,15 +13,14 @@ class AsteroidDetailsPage extends StatefulWidget {
 }
 
 class _AsteroidDetailsPageState extends State<AsteroidDetailsPage> {
-  final AsterankApiService _mpc = AsterankApiService(enableLogs: true);
+  final AsterankApiService _asterank = AsterankApiService(enableLogs: true);
 
   bool _loading = false;
-  MpcRow? _mpcRow; // ✅ store fetched MPC data here
-  double? _bestA() => _mpcRow?.a ?? widget.asteroid.a;
-  double? _bestE() => _mpcRow?.e ?? widget.asteroid.e;
-  double? _bestI() => _mpcRow?.i; // CSV model didn’t have i; only MPC may provide it
-
-  /// Handy derived values for the UI if your widget wants them
+  AsterankObject? _asterankObj; // ✅ store fetched MPC data here
+  double? _bestA() => _asterankObj?.a ?? widget.asteroid.a;
+  double? _bestE() => _asterankObj?.e ?? widget.asteroid.e;
+  double? _bestI() => _asterankObj?.i; // CSV model didn’t have i; only MPC may provide it
+/// Handy derived values for the UI if your widget wants them
   double? _perihelionQ() {
     final a = _bestA(),
         e = _bestE();
@@ -52,9 +51,10 @@ class _AsteroidDetailsPageState extends State<AsteroidDetailsPage> {
           ? widget.asteroid.fullName.trim()
           : widget.asteroid.name.trim();
 
-      final row = await _mpc.fetchByDesignation(key);
+      final row = await _asterank.fetchByFullName(key)
+          ?? await _asterank.search(key, limit: 1).then((l) => l.isNotEmpty ? l.first : null);
       if (!mounted) return;
-      setState(() => _mpcRow = row);
+      setState(() => _asterankObj = row);
     } catch (e) {
       debugPrint('MPC details fetch error: $e');
     } finally {
@@ -105,8 +105,6 @@ class _AsteroidDetailsPageState extends State<AsteroidDetailsPage> {
               'q (AU): ${_perihelionQ()!.toStringAsFixed(6)}'),
           if (_aphelionQ() != null) Text(
               'Q (AU): ${_aphelionQ()!.toStringAsFixed(6)}'),
-          Text('MOID (AU): ${(_mpcRow?.moid ?? a.moid).toStringAsFixed(6)}'),
-          const Divider(height: 24),
 
           // … your MPC/CSV fields section below (as you already had) …
         ],

@@ -44,73 +44,26 @@ Asteroid asteroidFromNeowsMap(Map<String, dynamic> m) {
 
 // ---------------- MPC (typed: MpcRow) -> Asteroid ----------------
 
-Asteroid _asteroidFromMpcRow(MpcRow r) {
-  // Try to read absolute magnitude H if present on the type
-  double? h;
-  try {
-    final v = (r as dynamic).H;
-    if (v is num) h = v.toDouble();
-  } catch (_) {}
-  if (h == null) {
-    try {
-      final v = (r as dynamic).h;
-      if (v is num) h = v.toDouble();
-    } catch (_) {}
-  }
-
-  // Diameter (km) estimated from H if available; else unknown (0.0)
-  final diameterKm = (h != null) ? _estimateDiameterKmFromH(h) : 0.0;
-
-  final display = (r.readableDes ?? r.des ?? 'Unknown');
-  final moid = r.moid ?? 0.0;
-  final a = r.a ?? 0.0;
-  final e = r.e ?? 0.0;
-  final inc = r.i ?? 0.0;
-
-  // Neo flag from perihelion distance q = a(1-e) < 1.3 au (optional)
-  String neoFlag = 'unknown';
-  if (a > 0 && e >= 0) {
-    final q = a * (1 - e);
-    neoFlag = (q <= 1.3) ? 'Y' : 'N';
-  }
-
-  // Derive PHA when raw flag isn’t provided:
-  // PHA if (MOID ≤ 0.05 au) AND (diameter ≥ 0.14 km ~ 140 m)
-  // If diameter is unknown (0), this will be N (conservative).
-  String phaFlag = 'N';
-  try {
-    final raw = (r as dynamic).pha;
-    if (raw is bool) {
-      phaFlag = raw ? 'Y' : 'N';
-    } else if (raw is String) {
-      final s = raw.toLowerCase();
-      if (s == 'y' || s == 'true' || s == '1') phaFlag = 'Y';
-      if (s == 'n' || s == 'false' || s == '0') phaFlag = 'N';
-    }
-  } catch (_) {}
-  if (phaFlag == 'N') {
-    final moidClose = (moid > 0 && moid <= 0.05);
-    final bigEnough = (diameterKm >= 0.14);
-    if (moidClose && bigEnough) phaFlag = 'Y';
-  }
-
+Asteroid _asteroidFromAsterank(AsterankObject o) {
+  final display = o.title.isNotEmpty ? o.title : o.id;
   return Asteroid(
-    id: r.des ?? display,
+    id: o.id,
     name: display,
     fullName: display,
-    diameter: diameterKm,   // km
-    albedo: 0.0,
-    neo: neoFlag,
-    pha: phaFlag,
+    diameter: o.diameter ?? 0.0,
+    albedo: o.albedo ?? 0.0,
+    neo: (o.neo == true) ? 'Y' : 'N',
+    pha: 'unknown',   // not supplied by Asterank objects
     rotationPeriod: 0.0,
-    classType: 'MPC',
+    classType: 'Asterank',
     orbitId: 0,
-    moid: moid,
-    a: a,
-    e: e,
-    i: inc,
+    moid: 0.0,        // not supplied
+    a: o.a ?? 0.0,
+    e: o.e ?? 0.0,
+    i: o.i ?? 0.0,
   );
 }
+
 
 // If you still need a Map-based MPC mapper (not required if your service returns MpcRow):
 Asteroid asteroidFromMpcMap(Map<String, dynamic> m) {
@@ -167,46 +120,3 @@ Asteroid asteroidFromMpcMap(Map<String, dynamic> m) {
 /// Convenience: map a list of MPC items (Map form)
 List<Asteroid> asteroidsFromMpcList(List<Map<String, dynamic>> items) =>
     items.map(asteroidFromMpcMap).toList();
-/*
-
-/// ---------- Offline CSV -> Asteroid ----------
-/// Matches your current CSV indexes from earlier code:
-/// id(0), fullName(2), name(4), e(32), a(33), orbitId(27),
-/// diameter(15), albedo(17), pha(7), neo(6), rotationPeriod(18),
-/// moid(45), classType(60)
-Asteroid asteroidFromCsvRow(List<dynamic> row) {
-  String s(int idx) => _toString(idx < row.length ? row[idx] : null, fallback: '');
-  double d(int idx) => _toDouble(idx < row.length ? row[idx] : null);
-  int i(int idx) => (idx < row.length ? int.tryParse(row[idx].toString()) : null) ?? 0;
-
-  final id = s(0);
-  final name = s(4).isNotEmpty ? s(4) : (s(2).isNotEmpty ? s(2) : id);
-
-  return Asteroid(
-    id: id,
-    name: name,
-    fullName: s(2).isNotEmpty ? s(2) : name,
-    diameter: d(15),
-    albedo: d(17),
-    neo: s(6).isNotEmpty ? s(6) : 'unknown',
-    pha: s(7).isNotEmpty ? s(7) : 'unknown',
-    rotationPeriod: d(18),
-    classType: s(60).isNotEmpty ? s(60) : 'CSV',
-    orbitId: i(27),
-    moid: d(45),
-    a: d(33),
-    e: d(32),
-    i: d(31),
-  );
-}
-
-/// Convenience: map a CSV (first row header) to Asteroids (skips header)
-List<Asteroid> asteroidsFromCsvTable(List<List<dynamic>> table) {
-  if (table.isEmpty) return const [];
-  final List<Asteroid> out = [];
-  for (int r = 1; r < table.length; r++) {
-    out.add(asteroidFromCsvRow(table[r]));
-  }
-  return out;
-}
-*/

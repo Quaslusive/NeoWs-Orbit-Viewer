@@ -1,135 +1,123 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart'; // for kDebugMode
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:neows_app/service/http_client.dart';
 
-/// Minimal MPC model (you already have an Asteroid model; this is just a DTO)
-class MpcRow {
-  final String? des;            // numeric/packed designation
-  final String? readableDes;    // human-readable designation
-  final double? H;              // absolute magnitude
-  final double? a;              // semi-major axis (au)
-  final double? e;              // eccentricity
-  final double? i;              // inclination (deg)
-  final double? moid;           // minimum orbit intersection distance (au)
+/// Minimal DTO for Asterank "objects" endpoint.
+class AsterankObject {
+  final String id;          // best-effort stable id (pdes or full_name)
+  final String title;       // full_name (e.g., "1 Ceres")
+  final double? H;
+  final double? a;
+  final double? e;
+  final double? i;
+  final double? diameter;   // km (if present)
+  final double? albedo;     // (if present)
+  final bool? neo;          // not NEOWS; Asterank has a bool "neo"
+  final num? score;         // Asterank score (optional)
+  final num? price;         // Asterank "value" (optional)
 
-  MpcRow({
-    this.des,
-    this.readableDes,
-    this.H,
-    this.a,
-    this.e,
-    this.i,
-    this.moid,
+  AsterankObject({
+    required this.id,
+    required this.title,
+    this.H, this.a, this.e, this.i,
+    this.diameter, this.albedo,
+    this.neo, this.score, this.price,
   });
 
-  factory MpcRow.fromJson(Map<String, dynamic> j) => MpcRow(
-    des: j['des'] as String?,
-    readableDes: j['readable_des'] as String?,
-    H: _toDouble(j['H']),
-    a: _toDouble(j['a']),
-    e: _toDouble(j['e']),
-    i: _toDouble(j['i']),
-    moid: _toDouble(j['moid']),
-  );
-
-  static double? _toDouble(dynamic v) {
+  static double? _d(dynamic v) {
     if (v == null) return null;
     if (v is num) return v.toDouble();
     return double.tryParse(v.toString());
   }
+
+  factory AsterankObject.fromJson(Map<String, dynamic> j) {
+    final pdes = (j['pdes'] ?? '').toString();
+    final full = (j['full_name'] ?? '').toString();
+    final id = pdes.isNotEmpty ? pdes : (full.isNotEmpty ? full : 'unknown');
+    final title = full.isNotEmpty ? full : (pdes.isNotEmpty ? pdes : 'Unknown object');
+    return AsterankObject(
+      id: id,
+      title: title,
+      H: _d(j['H']), a: _d(j['a']), e: _d(j['e']), i: _d(j['i']),
+      diameter: _d(j['diameter']),
+      albedo: _d(j['albedo']),
+      neo: j['neo'] is bool ? j['neo'] as bool : null,
+      score: j['score'] as num?,
+      price: j['price'] as num?,
+    );
+  }
 }
 
 class AsterankApiService {
-  static const _httpsBase = 'https://www.asterank.com/api/mpc';
-  static const _httpBase  = 'http://asterank.com/api/mpc';
-
-  /// Toggle to print dev logs (only prints in debug/profile; not in release).
+  static const _base = 'https://www.asterank.com/api/asterank';
   final bool enableLogs;
-
   AsterankApiService({this.enableLogs = true});
 
-  void _log(String msg) {
-    if (enableLogs && kDebugMode) {
-      // ignore: avoid_print
-      print('[MPC] $msg');
+  void _log(String m) {
+    if (enableLogs)
+    { /* debugPrint ok */ } }
+
+  static List<Map<String, dynamic>> _decodeList(String s) {
+    final o = jsonDecode(s);
+    if (o is List) {
+      return o.whereType<Map<String, dynamic>>().toList();
     }
+    return const <Map<String, dynamic>>[];
   }
 
-  Future<http.Response> _getWithFallback(Uri httpsUrl, Uri httpUrl) async {
-    final sw = Stopwatch()..start();
-    _log('GET ${httpsUrl.toString()}');
-    try {
-      final r = await http.get(httpsUrl);
-      _log('HTTPS status=${r.statusCode} (${sw.elapsedMilliseconds} ms)');
-      if (r.statusCode == 200) return r;
-    } catch (e) {
-      _log('HTTPS error: $e');
-    }
-
-    _log('FALLBACK -> GET ${httpUrl.toString()}');
-    final r2 = await http.get(httpUrl);
-    _log('HTTP status=${r2.statusCode} (${sw.elapsedMilliseconds} ms total)');
-    return r2;
-  }
-
-  Future<List<Map<String, dynamic>>> _queryMany(
-      Map<String, dynamic> query, {
-        int limit = 50,
-      }) async {
-    final q = jsonEncode(query);
-    final https = Uri.parse(_httpsBase)
-        .replace(queryParameters: {'query': q, 'limit': '$limit'});
-    final httpu = Uri.parse(_httpBase)
-        .replace(queryParameters: {'query': q, 'limit': '$limit'});
-
-    _log('query=${q} limit=$limit');
-    final res = await _getWithFallback(https, httpu);
-
+  Future<List<Map<String, dynamic>>> _queryRaw(
+      Map<String, dynamic> query, {int limit = 50}
+      ) async {
+    final uri = Uri.parse(_base).replace(queryParameters: {
+      'query': jsonEncode(query),
+      'limit': '$limit',
+    });
+    final res = await Httpx.client.get(uri);
     if (res.statusCode != 200) {
-      _log('ERROR body: ${res.body}');
-      throw Exception('MPC API ${res.statusCode}');
+      throw Exception('Asterank API ${res.statusCode}');
     }
-
-    final data = jsonDecode(res.body);
-    if (data is! List) {
-      _log('Non-list payload received');
-      return const [];
-    }
-    _log('received ${data.length} rows');
-    return data.whereType<Map<String, dynamic>>().toList();
+    return compute(_decodeList, res.body);
   }
 
-  /// Search by partial match across readable_des and des.
-  Future<List<MpcRow>> searchMany(String term, {int limit = 50}) async {
-    final safe = _escapeRegex(term.trim());
-    final rows = await _queryMany({
+  Future<List<AsterankObject>> fetchTop({int limit = 50}) async {
+    final rows = await _queryRaw({'e': {r'$lt': 0.5}}, limit: limit);
+    return rows.map(AsterankObject.fromJson).toList();
+  }
+
+  Future<List<AsterankObject>> search(String term, {int limit = 50}) async {
+    final safe = term.trim().replaceAllMapped(RegExp(r'[.*+?^${}()|[\]\\]'), (m) => '\\${m[0]}');
+    final rows = await _queryRaw({
       r'$or': [
-        {'readable_des': {r'$regex': safe, r'$options': 'i'}},
-        {'des': {r'$regex': safe, r'$options': 'i'}},
+        {'full_name': {r'$regex': safe, r'$options': 'i'}},
+        {'pdes': {r'$regex': safe, r'$options': 'i'}},
       ]
     }, limit: limit);
-    return rows.map(MpcRow.fromJson).toList();
+    return rows.map(AsterankObject.fromJson).toList();
+  }
+  Future<AsterankObject?> fetchByFullName(String fullName) async {
+    final rows = await _queryRaw({'full_name': fullName}, limit: 1);
+    return rows.isEmpty ? null : AsterankObject.fromJson(rows.first);
   }
 
-  /// Seed list for initial view. You can tweak filters if desired.
-  Future<List<MpcRow>> fetchTop({int limit = 50}) async {
-    // Example filter: modest eccentricity to avoid super oddballs
-    final rows = await _queryMany({'e': {r'$lt': 0.5}}, limit: limit);
-    return rows.map(MpcRow.fromJson).toList();
+  // Optional compatibility shim for old MPC-style call sites:
+  Future<AsterankObject?> fetchByDesignation(String key) async {
+    final k = key.trim();
+    if (k.isEmpty) return null;
+
+    // numeric → pdes match or "(123) Name"
+    if (RegExp(r'^\d+$').hasMatch(k)) {
+      var r = await _queryRaw({'pdes': k}, limit: 1);
+      if (r.isNotEmpty) return AsterankObject.fromJson(r.first);
+      r = await _queryRaw({'full_name': {r'$regex': '^\\(?$k\\)?\\s', r'$options': 'i'}}, limit: 1);
+      if (r.isNotEmpty) return AsterankObject.fromJson(r.first);
+    }
+
+    // full_name exact, then regex
+    final exact = await _queryRaw({'full_name': k}, limit: 1);
+    if (exact.isNotEmpty) return AsterankObject.fromJson(exact.first);
+
+    final fuzzy = await _queryRaw({'full_name': {r'$regex': k, r'$options': 'i'}}, limit: 1);
+    return fuzzy.isEmpty ? null : AsterankObject.fromJson(fuzzy.first);
   }
-
-  Future<MpcRow?> fetchByDesignation(String designation) async {
-    final rows = await _queryMany({
-      r'$or': [
-        {'readable_des': designation}, // exact
-        {'des': designation},          // exact
-      ]
-    }, limit: 1);
-
-    if (rows.isEmpty) return null;
-    return MpcRow.fromJson(rows.first);
-  }
-
-  String _escapeRegex(String s) =>
-      s.replaceAllMapped(RegExp(r'[.*+?^${}()|[\]\\]'), (m) => '\\${m[0]}');
 }

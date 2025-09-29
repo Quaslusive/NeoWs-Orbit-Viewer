@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
-import 'asteroid_filters.dart';
+import 'package:neows_app/search/asteroid_filters.dart';
+import 'package:neows_app/utils/num_utils.dart';
+
 
 class AsteroidFilterSheet extends StatefulWidget {
   final AsteroidFilters initial;
   final bool supportsCloseApproach; // false for MPCORB-only views
+  final bool supportsDateWindow;
+  final bool supportsHazardFlag;
+
   const AsteroidFilterSheet({
     super.key,
     required this.initial,
-    required this.supportsCloseApproach,
+     this.supportsCloseApproach = false,
+     this.supportsDateWindow = false,
+     this.supportsHazardFlag = false,
+
   });
 
   @override
@@ -24,7 +32,7 @@ class _AsteroidFilterSheetState extends State<AsteroidFilterSheet> {
 
   // Range state for a few sliders we expose
   RangeValues _relVel = const RangeValues(0, 50);
-  RangeValues _diamM = const RangeValues(0, 3000);
+  RangeValues _diamKm = const RangeValues(0, 3000);
   RangeValues _h = const RangeValues(10, 30);
   RangeValues _e = const RangeValues(0, 1);
   RangeValues _a = const RangeValues(0, 6);
@@ -39,26 +47,22 @@ class _AsteroidFilterSheetState extends State<AsteroidFilterSheet> {
   void initState() {
     super.initState();
     f = widget.initial;
-    _queryCtl.text = f.query ?? '';
-    if (f.maxMissDistanceKm != null) {
-      _missCtl.text = f.maxMissDistanceKm!.round().toString();
-    }
+    _queryCtl.text = f.query;
     if (f.maxMoidAu != null) _moidCtl.text = f.maxMoidAu!.toStringAsFixed(3);
     if (f.minArcDays != null) _minArcCtl.text = '${f.minArcDays}';
     if (f.maxUncertaintyU != null) _maxUctl.text = '${f.maxUncertaintyU}';
     // Prime ranges from existing values if set
-    if (f.relVelKmS?.isSet == true) {
+    if (f.relVelKms?.isSet == true) {
       _relVel = RangeValues(
-        (f.relVelKmS!.min ?? 0).clamp(0, FilterBounds.relVelMax),
-        (f.relVelKmS!.max ?? FilterBounds.relVelMax)
+        (f.relVelKms!.min ?? 0).clamp(0, FilterBounds.relVelMax),
+        (f.relVelKms!.max ?? FilterBounds.relVelMax)
             .clamp(0, FilterBounds.relVelMax),
       );
     }
-    if (f.diameterM?.isSet == true) {
-      _diamM = RangeValues(
-        (f.diameterM!.min ?? 0).clamp(0, FilterBounds.diamMaxM),
-        (f.diameterM!.max ?? FilterBounds.diamMaxM)
-            .clamp(0, FilterBounds.diamMaxM),
+    if (f.diameterKm?.isSet == true) {
+      _diamKm= RangeValues(
+        (f.diameterKm!.min ?? 0).clamp(0, FilterBounds.diamMaxKm),
+        (f.diameterKm!.max ?? FilterBounds.diamMaxKm).clamp(0, FilterBounds.diamMaxKm),
       );
     }
     if (f.hMag?.isSet == true) {
@@ -97,19 +101,31 @@ class _AsteroidFilterSheetState extends State<AsteroidFilterSheet> {
 
   void _applyAndClose() {
     Navigator.of(context).pop<AsteroidFilters>(f.copyWith(
-      query: _queryCtl.text.trim().isEmpty ? null : _queryCtl.text.trim(),
-      maxMissDistanceKm: _parseDouble(_missCtl.text),
+      query: _queryCtl.text.trim(),                    // non-nullable
       maxMoidAu: _parseDouble(_moidCtl.text),
       minArcDays: _parseInt(_minArcCtl.text),
       maxUncertaintyU: _boundInt(_parseInt(_maxUctl.text), 0, 9),
-      relVelKmS: DoubleRange(min: _relVel.start, max: _relVel.end),
-      diameterM: DoubleRange(min: _diamM.start, max: _diamM.end),
+
+      // orbital/size
+      diameterKm: DoubleRange(min: _diamKm.start, max: _diamKm.end),
       hMag: DoubleRange(min: _h.start, max: _h.end),
       e: DoubleRange(min: _e.start, max: _e.end),
       aAu: DoubleRange(min: _a.start, max: _a.end),
       iDeg: DoubleRange(min: _i.start, max: _i.end),
+
+      // close-approach only if supported
+      relVelKms: widget.supportsCloseApproach
+          ? DoubleRange(min: _relVel.start, max: _relVel.end)
+          : null,
+      missDistanceKm: widget.supportsCloseApproach
+          ? DoubleRange(min: null, max: _parseDouble(_missCtl.text))
+          : null,
+
+      // date window only if supported
+      window: widget.supportsDateWindow ? f.window : null,
     ));
   }
+
 
   static double? _parseDouble(String s) {
     final t = s.trim();
@@ -158,7 +174,7 @@ class _AsteroidFilterSheetState extends State<AsteroidFilterSheet> {
               title: const Text('Filters'),
               actions: [
                 TextButton(
-                  onPressed: () => setState(() => f = AsteroidFilters()),
+                  onPressed: () => setState(() => f = const AsteroidFilters()),
                   child: const Text('Clear'),
                 ),
               ],
@@ -177,21 +193,27 @@ class _AsteroidFilterSheetState extends State<AsteroidFilterSheet> {
                 ),
                 const SizedBox(height: 12),
 
-                // WHEN
-                ListTile(
-                  title: const Text('Close-approach window'),
-                  subtitle: Text(
-                    f.window == null
-                        ? (caEnabled ? 'Optional' : 'Not available for this source')
-                        : '${f.window!.start.toIso8601String().split("T").first}  →  ${f.window!.end.toIso8601String().split("T").first}',
+                if (widget.supportsDateWindow)
+                  ListTile(
+                    title: const Text('Close-approach window'),
+                    subtitle: Text(
+                      f.window == null
+                          ? 'Optional'
+                          : '${f.window!.start.toIso8601String().split("T").first}  →  ${f.window!.end.toIso8601String().split("T").first}',
+                    ),
+                    trailing: ElevatedButton.icon(
+                      onPressed: _pickDateRange,
+                      icon: const Icon(Icons.date_range),
+                      label: const Text('Pick'),
+                    ),
+                  )
+                else
+                  const ListTile(
+                    title: Text('Close-approach window'),
+                    subtitle: Text('Not available for this source'),
+                    enabled: false,
                   ),
-                  enabled: caEnabled,
-                  trailing: ElevatedButton.icon(
-                    onPressed: caEnabled ? _pickDateRange : null,
-                    icon: const Icon(Icons.date_range),
-                    label: const Text('Pick'),
-                  ),
-                ),
+
                 const Divider(height: 24),
 
                 // CA FILTERS
@@ -207,9 +229,19 @@ class _AsteroidFilterSheetState extends State<AsteroidFilterSheet> {
                           keyboardType: TextInputType.number,
                           decoration: const InputDecoration(
                             labelText: 'Max miss distance (km)',
-                            helperText: 'Tip: 384,400 km ≈ 1 LD (Moon distance)',
+                            helperText: 'Tip: 384,400 km ≈ 1 LD',
                           ),
                         ),
+                        const SizedBox(height: 12),
+                        _range(
+                          title: 'Relative velocity (km/s)',
+                          values: _relVel,
+                          max: FilterBounds.relVelMax,
+                          divisions: 50,
+                          onChanged: (v) => setState(() => _relVel = v),
+                          labelBuilder: (v) => v.toStringAsFixed(1),
+                        ),
+                        // target body dropdown stays here if you use it
                         const SizedBox(height: 12),
                         _range(
                           title: 'Relative velocity (km/s)',
@@ -242,11 +274,11 @@ class _AsteroidFilterSheetState extends State<AsteroidFilterSheet> {
                 // SIZE / BRIGHTNESS
                 _sectionTitle('Size / Brightness'),
                 _range(
-                  title: 'Estimated diameter (m)',
-                  values: _diamM,
-                  max: FilterBounds.diamMaxM,
+                  title: 'Estimated diameter (Km)',
+                  values: _diamKm,
+                  max: FilterBounds.diamMaxKm,
                   divisions: 60,
-                  onChanged: (v) => setState(() => _diamM = v),
+                  onChanged: (v) => setState(() => _diamKm = v),
                   labelBuilder: (v) => v.round().toString(),
                 ),
                 const SizedBox(height: 8),
@@ -259,11 +291,13 @@ class _AsteroidFilterSheetState extends State<AsteroidFilterSheet> {
                   onChanged: (v) => setState(() => _h = v),
                   labelBuilder: (v) => v.toStringAsFixed(1),
                 ),
-                SwitchListTile(
-                  value: f.phaOnly,
-                  onChanged: (b) => setState(() => f = f.copyWith(phaOnly: b)),
-                  title: const Text('Only potentially hazardous (PHA)'),
-                ),
+                if (widget.supportsHazardFlag)
+                  SwitchListTile(
+                    value: f.phaOnly,
+                    onChanged: (b) => setState(() => f = f.copyWith(phaOnly: b)),
+                    title: const Text('Only potentially hazardous (PHA)'),
+                  ),
+
                 const Divider(height: 24),
 
                 // ORBIT CLASS
