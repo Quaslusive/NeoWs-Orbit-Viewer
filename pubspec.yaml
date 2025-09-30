@@ -1,5 +1,5 @@
 name: neows_app
-description: "java23 Examensarbete Carl_Sundberg - NeoWs"
+description: "java23 Examensarbete - NeoWs"
 publish_to: 'Grit Academy'
 
 version: 1.0.0+1
@@ -14,19 +14,12 @@ dependencies:
   url_launcher: ^6.0.20
   cupertino_icons: ^1.0.8
   envied: ^1.2.0
-  flutter_svg: ^2.2.0     # optional to upgrade later
+  flutter_svg: ^2.2.0
   json_annotation: ^4.4.0
   intl: ^0.18.1
-  flutter_inappwebview: ^6.1.5
   path_provider: ^2.1.4
- # csv: ^5.0.2
   fl_chart: ^0.66.0
   shared_preferences: ^2.3.2
- # drift: ^2.28.1                # bump
- # drift_flutter: ^0.2.2         # bump to match drift 2.28
- # path: ^1.9.0
- # sqlite3_flutter_libs: ^0.5.24
- # web: ^1.1.1                   # NEW → provides toJS/js interop on web
   cached_network_image: ^3.3.1
   timeago: ^3.6.1
   webview_flutter: ^4.13.0
@@ -38,13 +31,20 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.9.2
-  build_runner: ^2.6.0         # bump (works well with drift_dev 2.28)
+  build_runner: ^2.6.0
   json_serializable: ^6.7.1
   envied_generator: ^1.2.0
- # drift_dev: ^2.28.1            # bump
 
 flutter:
-  uses-material-design: true     # <-- fix indent (2 spaces)
+  uses-material-design: true
+  fonts:
+    - family: EVA-Matisse
+      fonts:
+      - asset: lib/assets/fonts/EVA-Matisse/EVA-Matisse_Classic.ttf
+        weight: 400
+      - asset: lib/assets/fonts/EVA-Matisse/EVA-Matisse_Standard.ttf
+        weight: 400
+
   assets:
     - lib/assets/images/icon/icon1.png
     - lib/assets/images/NASA_Worm_logo.svg

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:neows_app/search/asteroid_filters.dart';
-import 'package:neows_app/utils/num_utils.dart';
 
 
 class AsteroidFilterSheet extends StatefulWidget {

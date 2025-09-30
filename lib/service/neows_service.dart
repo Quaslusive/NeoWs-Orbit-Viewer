@@ -1,12 +1,14 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';           // <- for compute()
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
-import 'package:neows_app/service/http_client.dart'; // <- NEW
+import 'package:neows_app/service/http_client.dart';
 
 class NeoWsService {
   final String apiKey;
-  NeoWsService(this.apiKey);
+
+
+  NeoWsService({required this.apiKey});
 
   int _clampLimit(int v) => v.clamp(10, 1000);
 
@@ -32,28 +34,66 @@ class NeoWsService {
     return double.tryParse(v.toString());
   }
 
-  Future<List<Map<String, dynamic>>> feed(DateTimeRange dr, int limit) async {
-    final days = dr.end.difference(dr.start).inDays.abs();
-    final end = days > 6 ? dr.start.add(const Duration(days: 6)) : dr.end;
+  static const _base = 'https://api.nasa.gov/neo/rest/v1';
 
-    String fmt(DateTime d) => d.toIso8601String().substring(0, 10);
-    final uri = Uri.parse(
-      'https://api.nasa.gov/neo/rest/v1/feed'
-          '?start_date=${fmt(dr.start)}&end_date=${fmt(end)}&api_key=$apiKey',
-    );
-
-    final data = await _getJson(uri);
-    final neo = data['near_earth_objects'] as Map<String, dynamic>? ?? {};
-    final List<Map<String, dynamic>> it = [];
-    neo.forEach((_, list) {
-      for (final row in (list as List)) {
-        it.add(row as Map<String, dynamic>);
-      }
+  Future<Map<String, dynamic>> _get(String url, [Map<String, String>? q]) async {
+    final uri = Uri.parse(url).replace(queryParameters: {
+      ...(q ?? {}), 'api_key': apiKey,
     });
-    return it.take(_clampLimit(limit)).toList();
+    final res = await http.get(uri);
+    if (res.statusCode != 200) {
+      throw Exception('NeoWs error ${res.statusCode}: ${res.body}');
+    }
+    return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
-  // ---------- NEW: browse "search" ----------
+  String _ymd(DateTime d) => d.toIso8601String().split('T').first;
+
+  /// feed wrapper returning a flat list
+  Future<List<Map<String, dynamic>>> feed(DateTimeRange range, int limit) async {
+    final lim = _clampLimit(limit);
+    final data = await _get('$_base/feed', {
+      'start_date': _ymd(range.start),
+      'end_date'  : _ymd(range.end),
+      'detailed'  : 'false',
+    });
+
+    final neoByDate =
+    (data['near_earth_objects'] as Map).cast<String, dynamic>();
+
+    final out = <Map<String, dynamic>>[];
+    for (final v in neoByDate.values) {
+      final dayList = (v as List?) ?? const [];
+      for (final row in dayList) {
+        out.add((row as Map).cast<String, dynamic>());
+        if (out.length >= lim) break;
+      }
+      if (out.length >= lim) break;
+    }
+    return out;
+  }
+
+  /// Today’s feed → returns a flat list of NEO summaries.
+  Future<List<Map<String, dynamic>>> getTodayFeed() async {
+    // (could call feed() with today..today, but keep as-is if you prefer)
+    final data = await _get('$_base/feed/today');
+    final neoByDate =
+    (data['near_earth_objects'] as Map).cast<String, dynamic>();
+    final out = <Map<String, dynamic>>[];
+    for (final v in neoByDate.values) {
+      for (final row in (v as List)) {
+        out.add((row as Map).cast<String, dynamic>());
+      }
+    }
+    return out;
+  }
+
+  /// Full object with orbital_data
+  Future<Map<String, dynamic>> getNeoById(String neoId) async {
+    return _get('$_base/neo/$neoId');
+  }
+
+  /// browse search
   Future<List<Map<String, dynamic>>> search(String term, {int limit = 50}) async {
     final q = term.trim();
     if (q.isEmpty) return <Map<String, dynamic>>[];
@@ -89,7 +129,7 @@ class NeoWsService {
     return out;
   }
 
-  // ---------- NEW: orbit details ----------
+  /// orbit details
   Future<({double? a, double? e, double? i})> fetchDetailsByNameOrId(String key) async {
     final k = key.trim();
     if (k.isEmpty) return (a: null, e: null, i: null);

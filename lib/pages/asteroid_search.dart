@@ -1,23 +1,17 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-// Services + mappers
 import 'package:neows_app/service/neoWs_service.dart';
 import 'package:neows_app/service/asterank_api_service.dart' show AsterankApiService, AsterankObject;
 import 'package:neows_app/mappers/asteroid_mappers.dart';
 import 'package:neows_app/search/asteroid_filters.dart';
 import 'package:neows_app/search/asteroid_filter_sheet.dart';
-// UI + model
 import 'package:neows_app/model/asteroid_csv.dart';
 import 'package:neows_app/pages/asteroid_details_page.dart';
 import 'package:neows_app/widget/asteroid_card.dart';
-// Envied key
 import 'package:neows_app/env/env.dart';
-
-import 'package:neows_app/service/asteroid_filtering.dart'; // applyFilters + SortKey
-import 'package:neows_app/utils/num_utils.dart';// toDouble/toStr if you need them here
-
-import 'package:neows_app/service/source_caps.dart';          // NEW
+import 'package:neows_app/service/asteroid_filtering.dart';
+import 'package:neows_app/service/source_caps.dart';
 
 class AsteroidSearchPage extends StatefulWidget {
   const AsteroidSearchPage({super.key});
@@ -36,12 +30,10 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
   // Services
   late final NeoWsService _neo;
   late final AsterankApiService _asterank;
-final _cache = _ResultCache();
+  final _cache = _ResultCache();
 
   // cancel stale searches
   int _reqId = 0;
-
-
 
   // User options
   ApiSource _source = ApiSource.neows;
@@ -67,7 +59,7 @@ final _cache = _ResultCache();
   @override
   void initState() {
     super.initState();
-    _neo = NeoWsService(Env.nasaApiKey);
+    _neo = NeoWsService(apiKey: Env.nasaApiKey);
     _asterank = AsterankApiService(enableLogs: true);
     _dispatchSearch(currentTerm: '');
   }
@@ -123,11 +115,11 @@ final _cache = _ResultCache();
     _orbitLoading.add(ast.id);
     _orbitActive++;
     try {
-      // 1) If current source is NeoWs and details endpoint exists, try it first
+
       if (_source == ApiSource.neows) {
         try {
 
-          final d = await _neo.fetchDetailsByNameOrId(term); // implement if not present
+          final d = await _neo.fetchDetailsByNameOrId(term);
           final a = d.a, e = d.e, i = d.i;
           if (a != null && a > 0 && e != null && e > 0) {
             _orbitCache[ast.id] = (a: a, e: e, i: i);

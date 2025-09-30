@@ -1,8 +1,8 @@
-import 'package:neows_app/utils/num_utils.dart'; // your toDouble(), toStr(), estimateDiameterFromH
-import 'package:neows_app/search/asteroid_filters.dart'; // your AsteroidFilters + DoubleRange
-import 'package:neows_app/model/asteroid_csv.dart'; // adjust import to your model
+import 'dart:math' as math;
+import 'package:neows_app/search/asteroid_filters.dart';
+import 'package:neows_app/model/asteroid_csv.dart';
 
-enum SortKey { size, moid, name, e, a, i } // removed h, vel (not in your model)
+enum SortKey { size, moid, name, e, a, i }
 
 extension AsteroidFiltering on List<Asteroid> {
   List<Asteroid> applyFilters(
@@ -104,3 +104,26 @@ bool _isHazardous(Asteroid a) {
   if (s == 'y' || s == 'yes' || s == 'true' || s == '1') return true;
   return false;
 }
+
+
+double toDouble(dynamic v, {double fallback = 0.0}) {
+  if (v == null) return fallback;
+  if (v is num) return v.toDouble();
+  final p = double.tryParse(v.toString().trim());
+  return p ?? fallback;
+}
+
+String toStr(dynamic v, {String fallback = ''}) {
+  if (v == null) return fallback;
+  final s = v.toString().trim();
+  return s.isEmpty ? fallback : s;
+}
+
+/// Estimate diameter in km from H magnitude.
+/// Default geometric albedo p = 0.14
+double estimateDiameterFromH(double? H, {double p = 0.14}) {
+  if (H == null) return 0.0;
+  if (p <= 0) p = 0.14;
+  return 1329.0 / math.sqrt(p) * math.pow(10.0, -H / 5.0);
+}
+
