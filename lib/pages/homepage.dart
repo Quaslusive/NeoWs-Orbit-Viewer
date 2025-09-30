@@ -94,7 +94,7 @@ class HomePage extends StatelessWidget {
           ElevatedButton(
             child: const Text("Orbit Viewer"),
             onPressed: () {
-              Navigator.pushNamed(context, "/orbit_viewer_3d_today");
+              Navigator.pushNamed(context, "/orbit_viewer_3d_page");
             },
           ),
           const SizedBox(height: 20),

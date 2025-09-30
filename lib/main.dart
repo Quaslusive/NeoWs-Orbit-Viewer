@@ -76,7 +76,7 @@ class MyApp extends StatelessWidget {
             "/asteroid_search": (context) => const AsteroidSearchPage(),
             "/acknowledgements_page": (context) => const AcknowledgementsPage(),
             "/settings_page": (context) => SettingsPage(controller: settings),
-            "/today_orbits_3d_page": (context) => const TodayOrbits3DPageSoft(apiKey: Env.nasaApiKey),
+            "/orbit_viewer_3d_page": (context) => const TodayOrbits3DPageSoft(apiKey: Env.nasaApiKey),
             "/news": (context) => NewsPage(repo: NewsRepository(SpaceflightNewsService()),
             ),
           },
