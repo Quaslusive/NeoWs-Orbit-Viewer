@@ -23,6 +23,7 @@ dependencies:
   cached_network_image: ^3.3.1
   timeago: ^3.6.1
   webview_flutter: ^4.13.0
+  webview_flutter_android: ^4.10.3
   modal_bottom_sheet: ^3.0.0
 
 
