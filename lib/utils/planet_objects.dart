@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 
 class Planet {
   final String name;
-  final double a; // semi-major axis (AU)
-  final double e; // eccentricity
-  final double i; // inclination (deg)
-  final double omega; // argument of periapsis ω (deg)
-  final double Omega; // longitude of ascending node Ω (deg)
-  final double M0deg; // mean anomaly at epoch (deg)
-  final DateTime epoch; // epoch of elements
+  final double a;        ///semi-major axis (AU)
+  final double e;        ///eccentricity
+  final double i;        ///inclination (deg)
+  final double omega;    /// argument of periapsis ω (deg)
+  final double Omega;    /// longitude of ascending node Ω (deg)
+  final double M0deg;    /// mean anomaly at epoch (deg)
+  final DateTime epoch;  /// epoch of elements
   final Color color;
-  final double radiusPx; // draw size on screen
+  final double radiusPx; /// draw size on screen
+  // final RadialGradient radialGradient; /// cosmetic Glow
 
   const Planet({
     required this.name,
@@ -23,6 +24,7 @@ class Planet {
     required this.epoch,
     required this.color,
     required this.radiusPx,
+  //  required this.radialGradient
   });
 }
 

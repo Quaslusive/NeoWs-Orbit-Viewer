@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import '../model/neo_models.dart';
-import '../utils/mini_3d.dart';
-import '../utils/orbit_3d_math.dart';
-import '../utils/planet_models.dart';
+import 'package:neows_app/model/neo_models.dart';
+import 'package:neows_app/utils/mini_3d.dart';
+import 'package:neows_app/utils/orbit_3d_math.dart';
+import 'package:neows_app/utils/planet_objects.dart';
 
 class Orbit3DItem {
   Orbit3DItem({required this.neo, required this.el, required this.color});
@@ -18,66 +18,64 @@ class Orbit3DItem {
 }
 
 class Orbit3DCanvas extends StatefulWidget {
-  const Orbit3DCanvas(
-      {super.key,
-      required this.items,
-      this.onSelect,
-      this.simDaysPerSec = 5.0,
-      this.stepsPerOrbit = 220,
-      this.planets = const [],
-      this.showStars = true,
-      this.starCount = 800,
-      this.paused = false,
-      this.rotateSensitivity = 0.004,
-      this.zoomSensitivity = 0.05,
-      this.minDistance = 2.0,
-      this.maxDistance = 50.0,
-      this.invertY = true,
-      this.showAxes = true,
-      this.showGrid = true,
-      this.gridSpacingAu = 0.5,
-      this.gridExtentAu = 3.0,
-      this.axisXColor = const Color(0xFFFF6B6B),
-      this.axisYColor = const Color(0xFF6BFF8A),
-      this.gridColor = const Color(0x66FFFFFF),
-      this.planetOrbitWidth = 2.6,
-      this.planetDotScale = 1.6,
-      this.planetOrbitOpacity = 0.85,
-      this.planetLabelStyle = const TextStyle(
-        color: Colors.yellow,
-        backgroundColor: Colors.black,
-        fontSize: 15,
-        fontFamily: 'EVA-Matisse_Standard',
-        fontWeight: FontWeight.bold,
-      ),
-      this.showAsteroidLabels = true,
-      this.asteroidLabelOpacity = 0.5,
-      this.asteroidLabelStyle = const TextStyle(
-        color: Colors.white,
-       // backgroundColor: Colors.black,
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-      ),
-      this.selectedAsteroidLabelStyle = const TextStyle(
-        color: Colors.yellow,
-        backgroundColor: Colors.black,
-        fontSize: 17,
-        fontWeight: FontWeight.w800,
-  ),
-        this.showShadowPinsAndNodes = true,
-        this.orbitShadowOpacity = 0.35,
-        this.pinEveryN = 10,
-        this.pinAboveColor = const Color(0xFF4CAF50),
-        this.pinBelowColor = const Color(0xFFE57373),
-        this.nodeAscColor = const Color(0xFF7CFC00),
-        this.nodeDescColor = const Color(0xFFFF6B6B),
-        this.nodeRipplePeriodMs = 2200,
-        this.nodeRippleMaxRadiusPx = 26.0,
-
-        this.onSimDaysChanged,
-        this.resetTick = 0,
-
-      });
+  const Orbit3DCanvas({
+    super.key,
+    required this.items,
+    this.onSelect,
+    this.simDaysPerSec = 5.0,
+    this.stepsPerOrbit = 220,
+    this.planets = const [],
+    this.showStars = true,
+    this.starCount = 800,
+    this.paused = false,
+    this.rotateSensitivity = 0.004,
+    this.zoomSensitivity = 0.05,
+    this.minDistance = 2.0,
+    this.maxDistance = 50.0,
+    this.invertY = false,
+    this.showAxes = true,
+    this.showGrid = true,
+    this.gridSpacingAu = 0.5,
+    this.gridExtentAu = 3.0,
+    this.axisXColor = const Color(0xFFFF6B6B),
+    this.axisYColor = const Color(0xFF6BFF8A),
+    this.gridColor = const Color(0x66FFFFFF),
+    this.planetOrbitWidth = 2.6,
+    this.planetDotScale = 1.6,
+    this.planetOrbitOpacity = 0.85,
+    this.planetLabelStyle = const TextStyle(
+      color: Colors.yellow,
+      backgroundColor: Colors.black,
+      fontSize: 15,
+      fontFamily: 'EVA-Matisse_Standard',
+      fontWeight: FontWeight.bold,
+    ),
+    this.showAsteroidLabels = true,
+    this.asteroidLabelOpacity = 0.5,
+    this.asteroidLabelStyle = const TextStyle(
+      color: Colors.white,
+      // backgroundColor: Colors.black,
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+    ),
+    this.selectedAsteroidLabelStyle = const TextStyle(
+      color: Colors.yellow,
+      backgroundColor: Colors.black,
+      fontSize: 17,
+      fontWeight: FontWeight.w800,
+    ),
+    this.showShadowPinsAndNodes = true,
+    this.orbitShadowOpacity = 0.35,
+    this.pinEveryN = 10,
+    this.pinAboveColor = const Color(0xFF4CAF50),
+    this.pinBelowColor = const Color(0xFFE57373),
+    this.nodeAscColor = const Color(0xFF7CFC00),
+    this.nodeDescColor = const Color(0xFFFF6B6B),
+    this.nodeRipplePeriodMs = 2200,
+    this.nodeRippleMaxRadiusPx = 26.0,
+    this.onSimDaysChanged,
+    this.resetTick = 0,
+  });
 
   final List<Orbit3DItem> items;
   final void Function(Orbit3DItem)? onSelect;
@@ -115,17 +113,16 @@ class Orbit3DCanvas extends StatefulWidget {
 
   final bool showShadowPinsAndNodes;
   final double orbitShadowOpacity;
-  final int pinEveryN;                 // draw a pin every N polyline points
+  final int pinEveryN; // draw a pin every N polyline points
   final Color pinAboveColor;
   final Color pinBelowColor;
-  final Color nodeAscColor;            // ascending node
-  final Color nodeDescColor;           // descending node
+  final Color nodeAscColor; // ascending node
+  final Color nodeDescColor; // descending node
   final int nodeRipplePeriodMs;
   final double nodeRippleMaxRadiusPx;
 
   final void Function(double elapsedDays)? onSimDaysChanged; // emit days elapsed (since app open/reset)
-  final int resetTick;                                      // bump this to request a reset
-
+  final int resetTick; // bump this to request a reset
 
   @override
   State<Orbit3DCanvas> createState() => _Orbit3DCanvasState();
@@ -292,33 +289,33 @@ class _Orbit3DCanvasState extends State<Orbit3DCanvas>
       },
       child: CustomPaint(
         painter: _Orbit3DPainter(
-            items: widget.items,
-            planets: widget.planets,
-            now: _simNow,
-            steps: widget.stepsPerOrbit,
-            yaw: _yaw,
-            pitch: _pitch,
-            dist: _dist,
-            cameraTarget: _camTarget,
-            selectedId: _selectedId,
-            highlightColor: _highlightColor,
-            showStars: widget.showStars,
-            starCount: widget.starCount,
-            labelStyle: widget.planetLabelStyle,
-            showAxes: widget.showAxes,
-            showGrid: widget.showGrid,
-            gridSpacingAu: widget.gridSpacingAu,
-            gridExtentAu: widget.gridExtentAu,
-            axisXColor: widget.axisXColor,
-            axisYColor: widget.axisYColor,
-            gridColor: widget.gridColor,
-            planetOrbitWidth: widget.planetOrbitWidth,
-            planetDotScale: widget.planetDotScale,
-            planetOrbitOpacity: widget.planetOrbitOpacity,
-            showAsteroidLabels: widget.showAsteroidLabels,
-            asteroidLabelOpacity: widget.asteroidLabelOpacity,
-            asteroidLabelStyle: widget.asteroidLabelStyle,
-            selectedAsteroidLabelStyle: widget.selectedAsteroidLabelStyle,
+          items: widget.items,
+          planets: widget.planets,
+          now: _simNow,
+          steps: widget.stepsPerOrbit,
+          yaw: _yaw,
+          pitch: _pitch,
+          dist: _dist,
+          cameraTarget: _camTarget,
+          selectedId: _selectedId,
+          highlightColor: _highlightColor,
+          showStars: widget.showStars,
+          starCount: widget.starCount,
+          labelStyle: widget.planetLabelStyle,
+          showAxes: widget.showAxes,
+          showGrid: widget.showGrid,
+          gridSpacingAu: widget.gridSpacingAu,
+          gridExtentAu: widget.gridExtentAu,
+          axisXColor: widget.axisXColor,
+          axisYColor: widget.axisYColor,
+          gridColor: widget.gridColor,
+          planetOrbitWidth: widget.planetOrbitWidth,
+          planetDotScale: widget.planetDotScale,
+          planetOrbitOpacity: widget.planetOrbitOpacity,
+          showAsteroidLabels: widget.showAsteroidLabels,
+          asteroidLabelOpacity: widget.asteroidLabelOpacity,
+          asteroidLabelStyle: widget.asteroidLabelStyle,
+          selectedAsteroidLabelStyle: widget.selectedAsteroidLabelStyle,
           showShadowPinsAndNodes: widget.showShadowPinsAndNodes,
           orbitShadowOpacity: widget.orbitShadowOpacity,
           pinEveryN: widget.pinEveryN,
@@ -365,7 +362,6 @@ class _Orbit3DPainter extends CustomPainter {
     required this.asteroidLabelOpacity,
     required this.asteroidLabelStyle,
     required this.selectedAsteroidLabelStyle,
-
     required this.showShadowPinsAndNodes,
     required this.orbitShadowOpacity,
     required this.pinEveryN,
@@ -375,7 +371,6 @@ class _Orbit3DPainter extends CustomPainter {
     required this.nodeDescColor,
     required this.nodeRipplePeriodMs,
     required this.nodeRippleMaxRadiusPx,
-
   });
 
   final List<Orbit3DItem> items;
@@ -409,8 +404,6 @@ class _Orbit3DPainter extends CustomPainter {
   final int nodeRipplePeriodMs;
   final double nodeRippleMaxRadiusPx;
 
-
-
 // cache for grid world points (rebuild only if spacing/extent change)
   List<List<Offset3>>? _gridLines; // each is a 2-point line
   double? _cachedSpacing, _cachedExtent;
@@ -423,8 +416,7 @@ class _Orbit3DPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // background
     canvas.drawRect(
-        Offset.zero & size, Paint()
-      ..color = const Color(0xFF000000));
+        Offset.zero & size, Paint()..color = const Color(0xFF000000));
 
     final camPos = _sphericalToCartesian(dist, pitch, yaw);
     final cam = Camera3D(
@@ -442,9 +434,23 @@ class _Orbit3DPainter extends CustomPainter {
     // sun
     final sun = projectVec(const Offset3(0, 0, 0), cam, size);
     if (sun != null) {
-      canvas.drawCircle(sun, 10, Paint()
-        ..color = const Color(0xFFFFCC00));
+      const coreR = 20.0;
+      const glowR = 90.0;
+
+      // Outer glow
+      final glowPaint = Paint()
+        ..shader = const RadialGradient(
+          colors: [Colors.yellowAccent, Colors.transparent],
+          stops: [0.0, 1.0],
+        ).createShader(Rect.fromCircle(center: sun, radius: glowR))
+        ..blendMode = BlendMode.plus;
+      canvas.drawCircle(sun, glowR, glowPaint);
+
+      // Inner glow
+      final corePaint = Paint()..color = Colors.yellowAccent;
+      canvas.drawCircle(sun, coreR, corePaint);
     }
+
 
     // AU rings
     _drawAURings(canvas, size, cam, [0.5, 1.0, 1.5, 2.0]);
@@ -459,7 +465,8 @@ class _Orbit3DPainter extends CustomPainter {
         // ensure world polyline exists
         sel.cachedPoints ??= List<Offset3>.generate(steps + 1, (k) {
           final nu = k / steps * 2 * math.pi;
-          return orbitPoint3D(sel.el.a, sel.el.e, nu, sel.el.omega, sel.el.i, sel.el.Omega);
+          return orbitPoint3D(
+              sel.el.a, sel.el.e, nu, sel.el.omega, sel.el.i, sel.el.Omega);
         });
         _drawOrbitShadowPinsNodes(canvas, size, cam, sel, sel.cachedPoints!);
       }
@@ -530,11 +537,9 @@ class _Orbit3DPainter extends CustomPainter {
               Paint()
                 ..color = highlightColor.withValues(alpha: 0.25)
                 ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
-          canvas.drawCircle(spNow, 4.6, Paint()
-            ..color = highlightColor);
+          canvas.drawCircle(spNow, 4.6, Paint()..color = highlightColor);
         } else {
-          canvas.drawCircle(spNow, 3.4, Paint()
-            ..color = it.color);
+          canvas.drawCircle(spNow, 3.4, Paint()..color = it.color);
         }
       }
       if (spNow != null && showAsteroidLabels) {
@@ -544,8 +549,9 @@ class _Orbit3DPainter extends CustomPainter {
         final TextStyle style = isSelected
             ? selectedAsteroidLabelStyle
             : asteroidLabelStyle.copyWith(
-          color: asteroidLabelStyle.color?.withValues( alpha: asteroidLabelOpacity),
-        );
+                color: asteroidLabelStyle.color
+                    ?.withValues(alpha: asteroidLabelOpacity),
+              );
 
         // offset label relative to dot
         final Offset labelPos = spNow + const Offset(6, -6);
@@ -554,7 +560,6 @@ class _Orbit3DPainter extends CustomPainter {
       }
     }
   }
-
 
   void _drawStars(Canvas canvas, Size size, Camera3D cam) {
     // Generate deterministic star directions once or if size changed
@@ -574,8 +579,7 @@ class _Orbit3DPainter extends CustomPainter {
       _lastSize = size;
     }
 
-    final paint = Paint()
-      ..style = PaintingStyle.fill;
+    final paint = Paint()..style = PaintingStyle.fill;
     for (final dir in _starDirs!) {
       // Put star far away along dir (e.g., radius 1000 AU)
       final p = dir * 1000.0;
@@ -588,8 +592,8 @@ class _Orbit3DPainter extends CustomPainter {
     }
   }
 
-  void _drawAURings(Canvas canvas, Size size, Camera3D cam,
-      List<double> radiiAu) {
+  void _drawAURings(
+      Canvas canvas, Size size, Camera3D cam, List<double> radiiAu) {
     final ringPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.2)
       ..style = PaintingStyle.stroke
@@ -618,7 +622,6 @@ class _Orbit3DPainter extends CustomPainter {
 
   void _drawAxes(Canvas canvas, Size size, Camera3D cam) {
     final double L = gridExtentAu > 0 ? gridExtentAu : 3.0;
-
     // Y-axis (in our z-up mapping, ecliptic Y is world Z after our swap)
     _drawWorldLine(
       canvas,
@@ -739,8 +742,7 @@ class _Orbit3DPainter extends CustomPainter {
       canvas.drawPath(
         path,
         Paint()
-          ..color = pl.color
-              .withValues(alpha: (planetOrbitOpacity))
+          ..color = pl.color.withValues(alpha: (planetOrbitOpacity))
           ..style = PaintingStyle.stroke
           ..strokeWidth = planetOrbitWidth,
       );
@@ -760,8 +762,7 @@ class _Orbit3DPainter extends CustomPainter {
         canvas.drawCircle(
           spNow,
           pl.radiusPx * planetDotScale,
-          Paint()
-            ..color = pl.color,
+          Paint()..color = pl.color,
         );
         _drawLabel(canvas, spNow + const Offset(8, -8), pl.name);
       }
@@ -772,12 +773,10 @@ class _Orbit3DPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(text: text, style: labelStyle),
       textDirection: TextDirection.ltr,
-    )
-      ..layout(maxWidth: 220);
+    )..layout(maxWidth: 220);
 
     // soft shadow/outline for legibility
-    final bg = Paint()
-      ..color = Colors.black.withValues(alpha: 0.55);
+    final bg = Paint()..color = Colors.black.withValues(alpha: 0.55);
     canvas.save();
     canvas.translate(at.dx + 1.2, at.dy + 1.2);
     tp.paint(canvas, Offset.zero);
@@ -786,14 +785,13 @@ class _Orbit3DPainter extends CustomPainter {
     tp.paint(canvas, at);
   }
 
-  void _drawAsteroidLabel(Canvas canvas, Offset at, String name,
-      TextStyle style,
+  void _drawAsteroidLabel(
+      Canvas canvas, Offset at, String name, TextStyle style,
       {double shadowOpacity = 0.55}) {
     final tp = TextPainter(
       text: TextSpan(text: name, style: style),
       textDirection: TextDirection.ltr,
-    )
-      ..layout(maxWidth: 220);
+    )..layout(maxWidth: 220);
 
     // subtle shadow for legibility
     canvas.save();
@@ -803,17 +801,22 @@ class _Orbit3DPainter extends CustomPainter {
 
     tp.paint(canvas, at);
   }
+
 // Projects a world segment and draws it
-  void _lineWorld(Canvas c, Size sz, Camera3D cam, Offset3 a, Offset3 b, Paint p) {
+  void _lineWorld(
+      Canvas c, Size sz, Camera3D cam, Offset3 a, Offset3 b, Paint p) {
     final pa = projectVec(a, cam, sz);
     final pb = projectVec(b, cam, sz);
     if (pa == null || pb == null) return;
-    final path = Path()..moveTo(pa.dx, pa.dy)..lineTo(pb.dx, pb.dy);
+    final path = Path()
+      ..moveTo(pa.dx, pa.dy)
+      ..lineTo(pb.dx, pb.dy);
     c.drawPath(path, p);
   }
 
 // Core effect
-  void _drawOrbitShadowPinsNodes(Canvas canvas, Size size, Camera3D cam, Orbit3DItem it, List<Offset3> worldPts) {
+  void _drawOrbitShadowPinsNodes(Canvas canvas, Size size, Camera3D cam,
+      Orbit3DItem it, List<Offset3> worldPts) {
     // ---- 1) Orbit SHADOW on ecliptic plane (y == 0) ----
     final shadowPath = Path();
     Offset? first;
@@ -821,13 +824,17 @@ class _Orbit3DPainter extends CustomPainter {
       final pShadow = Offset3(p.x, 0.0, p.z); // project onto grid plane
       final sp = projectVec(pShadow, cam, size);
       if (sp == null) continue;
-      if (first == null) { shadowPath.moveTo(sp.dx, sp.dy); first = sp; }
-      else { shadowPath.lineTo(sp.dx, sp.dy); }
+      if (first == null) {
+        shadowPath.moveTo(sp.dx, sp.dy);
+        first = sp;
+      } else {
+        shadowPath.lineTo(sp.dx, sp.dy);
+      }
     }
     canvas.drawPath(
       shadowPath,
       Paint()
-        ..color = it.color.withOpacity(orbitShadowOpacity)
+        ..color = it.color.withValues(alpha: orbitShadowOpacity)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.0
         ..blendMode = BlendMode.srcOver,
@@ -835,10 +842,10 @@ class _Orbit3DPainter extends CustomPainter {
 
     // ---- 2) Vertical PINS (every Nth point) ----
     final pinPaintAbove = Paint()
-      ..color = pinAboveColor.withOpacity(0.85)
+      ..color = pinAboveColor.withValues(alpha: 0.85)
       ..strokeWidth = 1.6;
     final pinPaintBelow = Paint()
-      ..color = pinBelowColor.withOpacity(0.85)
+      ..color = pinBelowColor.withValues(alpha: 0.85)
       ..strokeWidth = 1.6;
 
     for (int k = 0; k < worldPts.length; k += pinEveryN.clamp(1, 9999)) {
@@ -874,8 +881,10 @@ class _Orbit3DPainter extends CustomPainter {
       canvas.drawCircle(nodeScreen, 3.0, Paint()..color = baseColor);
 
       // gentle ripple
-      final phase = (now.millisecondsSinceEpoch % nodeRipplePeriodMs) / nodeRipplePeriodMs;
-      final r = (phase * nodeRippleMaxRadiusPx).clamp(0.0, nodeRippleMaxRadiusPx);
+      final phase = (now.millisecondsSinceEpoch % nodeRipplePeriodMs) /
+          nodeRipplePeriodMs;
+      final r =
+          (phase * nodeRippleMaxRadiusPx).clamp(0.0, nodeRippleMaxRadiusPx);
       final alpha = (1.0 - phase).clamp(0.0, 1.0) * 0.8;
       canvas.drawCircle(
         nodeScreen,
@@ -883,7 +892,7 @@ class _Orbit3DPainter extends CustomPainter {
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.2
-          ..color = baseColor.withOpacity(alpha),
+          ..color = baseColor.withValues(alpha: alpha),
       );
     }
   }
@@ -898,31 +907,29 @@ class _Orbit3DPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _Orbit3DPainter old) =>
       old.now != now ||
-          old.yaw != yaw ||
-          old.pitch != pitch ||
-          old.dist != dist ||
-          old.items != items ||
-          old.planets != planets ||
-          old.showStars != showStars ||
-          old.starCount != starCount ||
-          old.selectedId != selectedId ||
-          old.cameraTarget != cameraTarget ||
-          old.labelStyle != labelStyle ||
-          old.highlightColor != highlightColor ||
-          old.showAxes != showAxes ||
-          old.showGrid != showGrid ||
-          old.gridSpacingAu != gridSpacingAu ||
-          old.gridExtentAu != gridExtentAu ||
-          old.axisXColor != axisXColor ||
-          old.axisYColor != axisYColor ||
-          old.gridColor != gridColor ||
-
-          old.showShadowPinsAndNodes != showShadowPinsAndNodes ||
-          old.orbitShadowOpacity != orbitShadowOpacity ||
-          old.pinEveryN != pinEveryN ||
-          old.pinAboveColor != pinAboveColor ||
-          old.pinBelowColor != pinBelowColor ||
-          old.nodeAscColor != nodeAscColor ||
-          old.nodeDescColor != nodeDescColor;
-
+      old.yaw != yaw ||
+      old.pitch != pitch ||
+      old.dist != dist ||
+      old.items != items ||
+      old.planets != planets ||
+      old.showStars != showStars ||
+      old.starCount != starCount ||
+      old.selectedId != selectedId ||
+      old.cameraTarget != cameraTarget ||
+      old.labelStyle != labelStyle ||
+      old.highlightColor != highlightColor ||
+      old.showAxes != showAxes ||
+      old.showGrid != showGrid ||
+      old.gridSpacingAu != gridSpacingAu ||
+      old.gridExtentAu != gridExtentAu ||
+      old.axisXColor != axisXColor ||
+      old.axisYColor != axisYColor ||
+      old.gridColor != gridColor ||
+      old.showShadowPinsAndNodes != showShadowPinsAndNodes ||
+      old.orbitShadowOpacity != orbitShadowOpacity ||
+      old.pinEveryN != pinEveryN ||
+      old.pinAboveColor != pinAboveColor ||
+      old.pinBelowColor != pinBelowColor ||
+      old.nodeAscColor != nodeAscColor ||
+      old.nodeDescColor != nodeDescColor;
 }

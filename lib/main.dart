@@ -5,7 +5,7 @@ import 'package:neows_app/pages/asteroid_page.dart';
 import 'package:neows_app/pages/homepage.dart';
 import 'package:neows_app/pages/asteroid_search.dart';
 import 'package:neows_app/pages/acknowledgements_page.dart';
-import 'package:neows_app/pages/orbit_viewer_3d.dart';
+import 'package:neows_app/pages/orbit_viewer_3d_page.dart';
 import 'package:neows_app/settings/settings_controller.dart';
 import 'package:neows_app/settings/settings_model.dart';
 import 'package:neows_app/settings/settings_service.dart';
@@ -18,7 +18,6 @@ import 'package:neows_app/service/spaceflight_news_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   // 1) Create & init the settings controller
   final settings = SettingsController(SettingsService());
   await settings.init();

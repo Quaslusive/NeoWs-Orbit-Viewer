@@ -1,14 +1,9 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:neows_app/service/neoWs_service.dart';
-
-import 'package:neows_app/utils/planet_models.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../model/neo_models.dart';
-
-import '../widget/orbit_3d_canvas.dart';
+import 'package:neows_app/utils/planet_objects.dart';
+import 'package:neows_app/widget/asteroid_web_sheet.dart';
+import 'package:neows_app/model/neo_models.dart';
+import 'package:neows_app/widget/orbit_3d_canvas.dart';
 
 class TodayOrbits3DPageSoft extends StatefulWidget {
   const TodayOrbits3DPageSoft({super.key, required this.apiKey});
@@ -28,7 +23,7 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
   bool _loading = true;
   String? _err;
 
-  int _resetTick = 0;      // bump to trigger canvas reset
+  int _resetTick = 0; // bump to trigger canvas reset
   double _elapsedDays = 0; // shown in the UI
 
   @override
@@ -36,6 +31,7 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
     super.initState();
     _load();
   }
+
 
   Future<void> _load() async {
     try {
@@ -67,11 +63,15 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
     }
   }
 
-  void _openDetails3D(Orbit3DItem  it) {
+  void _openDetails3D(Orbit3DItem it) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: false,
       showDragHandle: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      enableDrag: true,
+      useSafeArea: false,
+      barrierColor: Colors.transparent,
+      backgroundColor: Colors.black87,
       builder: (_) => _DetailsSheet3D(item: it),
     );
   }
@@ -86,7 +86,16 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('NEO 3D Orbits – Today (Flutter)' )),
+      // TODO I might take appBar away
+      appBar: AppBar(
+          title: const Text('NEO 3D Orbits '),
+        toolbarTextStyle: TextStyle(
+          fontFamily: 'EVA',
+          fontWeight: FontWeight.bold,
+        ),
+        backgroundColor: Colors.black87,
+        foregroundColor: Colors.yellowAccent,
+      ),
       body: Stack(
         children: [
           Positioned.fill(
@@ -101,8 +110,10 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
               // Axis + grid controls:
               showAxes: true,
               showGrid: true,
-              gridSpacingAu: 1,   // try 0.2 for denser
-              gridExtentAu: 30.0,    // increase to 5–10 to see more
+              gridSpacingAu: 1,
+              // try 0.2 for denser
+              gridExtentAu: 30.0,
+              // increase to 5–10 to see more
               axisXColor: const Color(0xFFFF6B6B),
               axisYColor: const Color(0xFF6BFF8A),
               gridColor: const Color(0x33FFFFFF),
@@ -126,7 +137,7 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                  color: Colors.black54,
+                  color: Colors.black87,
                   borderRadius: BorderRadius.circular(12)),
               child: const Text(
                   'Pinch = zoom • Drag = orbit camera • Tap a dot',
@@ -136,7 +147,9 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
 
           // Controls overlay
           Positioned(
-            left: 12, right: 12, bottom: 12,
+            left: 12,
+            right: 12,
+            bottom: 12,
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -153,22 +166,41 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
                     children: [
                       IconButton(
                         onPressed: () => setState(() => _paused = !_paused),
-                        icon: Icon(_paused ? Icons.play_arrow : Icons.pause, color: Colors.white),
+                        icon: Icon(_paused ? Icons.play_arrow : Icons.pause,
+                            color: Colors.white),
                         tooltip: _paused ? 'Play' : 'Pause',
                       ),
-                      _SpeedBtn(label: '-20', onTap: () => setState(() => _speed = (_speed - 20).clamp(0, 200))),
-                      _SpeedBtn(label: '-1',  onTap: () => setState(() => _speed = (_speed - 1).clamp(0, 200))),
+                      _SpeedBtn(
+                          label: '-20',
+                          onTap: () => setState(
+                              () => _speed = (_speed - 20).clamp(0, 200))),
+                      _SpeedBtn(
+                          label: '-1',
+                          onTap: () => setState(
+                              () => _speed = (_speed - 1).clamp(0, 200))),
                       Chip(
                         label: Text('${_speed.toStringAsFixed(0)} d/s'),
                         backgroundColor: Colors.white10,
-                        labelStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.w700),
+                        labelStyle: const TextStyle(
+                            color: Colors.black, fontWeight: FontWeight.w700),
                         visualDensity: VisualDensity.compact,
                       ),
-                      _SpeedBtn(label: '+1',  onTap: () => setState(() => _speed = (_speed + 1).clamp(0, 200))),
-                      _SpeedBtn(label: '+20', onTap: () => setState(() => _speed = (_speed + 20).clamp(0, 200))),
+                      _SpeedBtn(
+                          label: '+1',
+                          onTap: () => setState(
+                              () => _speed = (_speed + 1).clamp(0, 200))),
+                      _SpeedBtn(
+                          label: '+20',
+                          onTap: () => setState(
+                              () => _speed = (_speed + 20).clamp(0, 200))),
                       OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(foregroundColor: Colors.white, minimumSize: const Size(0, 36)),
-                        onPressed: () => setState(() { _resetTick++; _elapsedDays = 0; }),
+                        style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(0, 36)),
+                        onPressed: () => setState(() {
+                          _resetTick++;
+                          _elapsedDays = 0;
+                        }),
                         icon: const Icon(Icons.restart_alt),
                         label: const Text('Reset'),
                       ),
@@ -179,25 +211,23 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
                     alignment: Alignment.centerRight,
                     child: Text(
                       'Δt: ${_elapsedDays.toStringAsFixed(1)} d',
-                      style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                          color: Colors.white70, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],
               ),
             ),
           ),
-
-
         ],
       ),
     );
   }
-
-
 }
 
 class _SpeedBtn extends StatelessWidget {
   const _SpeedBtn({required this.label, required this.onTap});
+
   final String label;
   final VoidCallback onTap;
 
@@ -240,25 +270,69 @@ class _Swatch extends StatelessWidget {
 }
 
 class _DetailsSheet3D extends StatelessWidget {
-  const _DetailsSheet3D({ required this.item});
+  const _DetailsSheet3D({required this.item});
+
   final Orbit3DItem item;
 
   @override
   Widget build(BuildContext context) {
     final n = item.neo;
     final el = item.el;
+    final name = item.neo.name;
 
-    final jplUrl = Uri.parse('https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=${n.id}');
-    final mpcUrl = Uri.parse('https://minorplanetcenter.net/db_search/show_object?object_id=${Uri.encodeComponent(n.name)}');
-    final wikiUrl = Uri.parse('https://en.wikipedia.org/w/index.php?search=${Uri.encodeComponent(n.name)}');
+    final jplUrl = Uri.parse(
+        'https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=${n.id
+            }');
+    final mpcUrl = Uri.parse(
+        'https://minorplanetcenter.net/db_search/show_object?object_id=${Uri
+            .encodeComponent(name)}');
 
-    Future<void> _go(Uri u) async {
+    String _slug(String s) => s
+            .replaceAll(RegExp(r'[()\[\],]'), '')
+            .trim()
+            .toLowerCase()
+            .replaceAll(RegExp(r'\s+'), '-');
+
+    final spaceRefUrl = Uri.parse(
+        'https://www.spacereference.org/asteroid/${_slug(name)}');
+
+/*
+    // local state for the toggle (Stateless workaround via ValueNotifier)
+    final openInApp = ValueNotifier<bool>(true);
+*/
+
+/*
+    Future<void> _openExt(Uri u) async {
       final ok = await launchUrl(u, mode: LaunchMode.externalApplication);
       if (!ok && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open ${u.host}')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Could not open ${u.host}')));
       }
     }
+*/
 
+    void _openInApp(SourceTab initial) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        enableDrag: false,
+        // WebView owns vertical scroll
+        backgroundColor: Colors.transparent,
+        builder: (_) =>
+            SpaceRefWebSheet(
+              title: name,
+              initialSource: initial,
+              // which one to show first
+              spaceRefUrl: spaceRefUrl,
+              jplUrl: jplUrl,
+              mpcUrl: mpcUrl,
+              siteSearchFallbackQuery: name, // SpaceRef slug fallback
+            ),
+      );
+    }
+/* TODO should I keep this
+
+    // Distance now
     double _heliocentricRAu({
       required double a,
       required double e,
@@ -269,9 +343,7 @@ class _DetailsSheet3D extends StatelessWidget {
       tUtc ??= DateTime.now().toUtc();
       const kGauss = 0.01720209895; // rad/day
       double meanMotion(double aAu) => kGauss / math.pow(aAu, 1.5);
-
       double toRad(double d) => d * math.pi / 180.0;
-
       double solveE(double M, double e) {
         double E = M;
         for (int i = 0; i < 12; i++) {
@@ -282,112 +354,88 @@ class _DetailsSheet3D extends StatelessWidget {
         return E;
       }
 
-      final dtDays = tUtc.difference(epochUtc).inMilliseconds / 86400000.0;
+      final dtDays = tUtc
+          .difference(epochUtc)
+          .inMilliseconds / 86400000.0;
       final M = toRad(M0deg) + meanMotion(a) * dtDays;
       final E = solveE(M, e);
-      final r = a * (1 - e * e) / (1 + e * math.cos(E)); // AU
-      return r;
+      return a * (1 - e * e) / (1 + e * math.cos(E)); // AU
     }
-    final rNow = _heliocentricRAu(
-      a: el.a, e: el.e, M0deg: el.M, epochUtc: el.epoch,
-    );
 
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 18),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Title row with hazard chip + copy button
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: SelectableText(
-                      n.name,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  if (n.isHazardous)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: Colors.redAccent),
-                      ),
-                      child: const Text('PHA', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700)),
-                    ),
-                  IconButton(
-                    tooltip: 'Copy NEO ID',
-                    onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: n.id));
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('NEO ID copied')));
-                      }
-                    },
-                    icon: const Icon(Icons.copy),
-                  ),
-                ],
-              ),
+    final rNow =
+    _heliocentricRAu(a: el.a, e: el.e, M0deg: el.M, epochUtc: el.epoch);
+*/
 
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 16,
-                runSpacing: 6,
-                children: [
-                  _KV('Hazard', n.isHazardous ? 'Potentially' : 'No'),
-                  _KV('a (AU)', el.a.toStringAsFixed(3)),
-                  _KV('e', el.e.toStringAsFixed(3)),
-                  _KV('i (°)', el.i.toStringAsFixed(2)),
-                  _KV('ω (°)', el.omega.toStringAsFixed(2)),
-                  _KV('Ω (°)', el.Omega.toStringAsFixed(2)),
-                  _KV('r now (AU)', rNow.toStringAsFixed(3)),        // NEW
-                  _KV('Epoch (UTC)', el.epoch.toIso8601String()),    // NEW
-                ],
-              ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
 
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () => _go(jplUrl),
-                    icon: const Icon(Icons.open_in_new),
-                    label: const Text('JPL SBDB'),
-                  ),
-                  OutlinedButton(
-                    onPressed: () => _go(mpcUrl),
-                    child: const Text('MPC DB'),
-                  ),
-                  OutlinedButton(
-                    onPressed: () => _go(wikiUrl),
-                    child: const Text('Wikipedia'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-            ],
+      child: Row(
+        children: [
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: () => _openInApp(SourceTab.jpl),
+            icon: const Icon(Icons.science_outlined),
+            label: const Text('JPL '),
           ),
-        ),
-      ),
+          ElevatedButton.icon(
+            onPressed: () => _openInApp(SourceTab.spaceRef),
+            icon: const Icon(Icons.auto_stories_outlined),
+            label: const Text('SpaceReference '),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: () => _openInApp(SourceTab.mpc),
+            icon: const Icon(Icons.public),
+            label: const Text('MPC '),
+          ),
+        ],
+      )
+
+
     );
   }
 }
+/*
 
-class _KV extends StatelessWidget {
-  final String k, v;
-  const _KV(this.k, this.v);
+// Small helper row widget (put below in the same file) TODO Do I need This?
+class _SourceLine extends StatelessWidget {
+  const _SourceLine({
+    required this.button,
+    required this.caption,
+    this.trailing,
+    this.onAlternate,
+  });
+
+  final Widget button;
+  final String caption;
+  final Widget? trailing;
+  final VoidCallback? onAlternate;
+
   @override
   Widget build(BuildContext context) {
-    final base = Theme.of(context).textTheme.bodyMedium!;
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      Text('$k: ', style: base),
-      SelectableText(v, style: base.copyWith(fontWeight: FontWeight.w600)),
-    ]);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Flexible(child: button),
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            trailing!,
+          ],
+        ]),
+        const SizedBox(height: 4),
+        GestureDetector(
+          onLongPress: onAlternate, // e.g., open SpaceRef site search
+          child: Text(
+            caption,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: Colors.white70),
+          ),
+        ),
+      ],
+    );
   }
 }
+*/

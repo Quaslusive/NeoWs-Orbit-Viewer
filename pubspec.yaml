@@ -11,14 +11,14 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.2.2
-  url_launcher: ^6.0.20
+  url_launcher: ^6.3.2
   cupertino_icons: ^1.0.8
   envied: ^1.2.0
   flutter_svg: ^2.2.0
   json_annotation: ^4.4.0
-  intl: ^0.18.1
+  intl: ^0.20.2
   path_provider: ^2.1.4
-  fl_chart: ^0.66.0
+  fl_chart: ^1.1.1
   shared_preferences: ^2.3.2
   cached_network_image: ^3.3.1
   timeago: ^3.6.1
@@ -30,8 +30,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
-  flutter_launcher_icons: ^0.9.2
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
   build_runner: ^2.6.0
   json_serializable: ^6.7.1
   envied_generator: ^1.2.0
