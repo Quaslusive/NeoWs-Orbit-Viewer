@@ -1,58 +1,89 @@
-import 'dart:math' as math;
+import 'dart:math';
+import 'package:flutter/foundation.dart';
+import 'package:neows_app/model/neo_models.dart';
+import 'package:neows_app/model/neo_models.dart';
 
-/// Gravitational parameter μ (Sun) in AU^3/day^2.
-/// Using k = 0.01720209895 (Gaussian gravitational constant):
-/// n = k / a^{3/2}; M(t) = M0 + n * (t - t0) in days.
-const double kGauss = 0.01720209895;
+class Vec3 {
+  final double x, y, z;
+  const Vec3(this.x, this.y, this.z);
+}
 
-double meanMotionAUPerDay(double a) => kGauss / math.pow(a, 1.5);
-
-/// Solve Kepler’s equation M = E - e sin E for eccentric anomaly E
-double solveKepler(double M, double e, {int iters = 12}) {
-  // M in radians
-  double E = M; // good initial guess for small e
-  for (int i = 0; i < iters; i++) {
-    final f = E - e * math.sin(E) - M;
-    final fp = 1 - e * math.cos(E);
+// Solve Kepler’s equation: E - e sinE = M   (all radians)
+double _solveKepler(double M, double e, {int iters = 8}) {
+  // good initial guess
+  var E = (e < 0.8) ? M : (M > pi ? M - e : M + e);
+  for (var k = 0; k < iters; k++) {
+    final f = E - e * sin(E) - M;
+    final fp = 1 - e * cos(E);
     E -= f / fp;
   }
+  // normalize for numeric stability
+  E %= (2 * pi);
+  if (E < 0) E += 2 * pi;
   return E;
 }
 
-double trueAnomalyFromMean(double M, double e) {
-  final E = solveKepler(M, e);
-  final cosE = math.cos(E);
-  final sinE = math.sin(E);
-  final beta = math.sqrt(1 - e * e);
-  final cosNu = (cosE - e) / (1 - e * cosE);
-  final sinNu = (beta * sinE) / (1 - e * cosE);
-  return math.atan2(sinNu, cosNu); // radians
+/// Rotate from perifocal (P,Q,W) to ECI using Ω, i, ω (all radians)
+/// We precompute the rotation matrix terms for speed.
+({double r11,double r12,double r21,double r22,double r31,double r32})
+_rotationPQW(double Omega, double i, double omega) {
+  final cO = cos(Omega), sO = sin(Omega);
+  final ci = cos(i),     si = sin(i);
+  final cw = cos(omega), sw = sin(omega);
+
+  return (
+  r11: cO*cw - sO*sw*ci,
+  r12: -cO*sw - sO*cw*ci,
+  r21: sO*cw + cO*sw*ci,
+  r22: -sO*sw + cO*cw*ci,
+  r31: sw*si,
+  r32: cw*si,
+  );
 }
 
-/// Get current true anomaly (radians) at time tUtc for orbit with (a,e,M0,epoch).
-double currentTrueAnomaly({
-  required double aAu,
-  required double e,
-  required double M0DegAtEpoch,
-  required DateTime epochUtc,
-  required DateTime tUtc,
-}) {
-  final dtDays = tUtc.difference(epochUtc).inMilliseconds / 86400000.0;
-  final n = meanMotionAUPerDay(aAu); // rad/day (since M is in rad if we use radians)
-  final M0 = M0DegAtEpoch * math.pi / 180.0;
-  final M = M0 + n * dtDays;
-  return trueAnomalyFromMean(M, e);
+/// Synchronous sampler (runs in an isolate via `compute`)
+List<Vec3> _sampleOrbitSync((OrbitElements el, int steps, DateTime t) args) {
+  final el    = args.$1;
+  final steps = args.$2;
+  final t     = args.$3;
+
+  // Mean anomaly at time t (radians)
+  final M_now = el.meanAnomalyAt(t);
+
+  // Precompute rotation
+  final R = _rotationPQW(el.Omega, el.i, el.omega);
+
+  final out = <Vec3>[];
+  for (var s = 0; s < steps; s++) {
+    // sweep the orbit uniformly in mean anomaly around the current M
+    final d = (s / steps) * 2 * pi;
+    final M = (M_now + d) % (2 * pi);
+
+    final E  = _solveKepler(M, el.e);
+    final cosE = cos(E), sinE = sin(E);
+
+    // distance in AU
+    final r = el.a * (1 - el.e * cosE);
+
+    // true anomaly (radians)
+    final nu = 2.0 * atan2(sqrt(1 + el.e) * sin(E / 2.0),
+        sqrt(1 - el.e) * cos(E / 2.0));
+
+    // perifocal coords (z = 0)
+    final xp = r * cos(nu);
+    final yp = r * sin(nu);
+
+    // rotate to ECI
+    final x = R.r11 * xp + R.r12 * yp;
+    final y = R.r21 * xp + R.r22 * yp;
+    final z = R.r31 * xp + R.r32 * yp;
+
+    out.add(Vec3(x, y, z));
+  }
+  return out;
 }
 
-/// Parametric point (AU) on ellipse in orbital plane (ignoring i,Ω,ω for 2D)
-/// If you want rotation: rotate by (Ω + ω) in the XY plane.
-({double x, double y}) ellipsePointAU(double a, double e, double nuRad) {
-  final r = a * (1 - e * e) / (1 + e * math.cos(nuRad));
-  return (x: r * math.cos(nuRad), y: r * math.sin(nuRad));
-}
-
-/// Rotate 2D by angle (radians)
-({double x, double y}) rot2D(double x, double y, double angRad) {
-  final c = math.cos(angRad), s = math.sin(angRad);
-  return (x: x * c - y * s, y: x * s + y * c);
+/// Public API: sample a polyline of the orbit at time `t` (radians/AU).
+Future<List<Vec3>> sampleOrbit(OrbitElements el, DateTime t, {int steps = 720}) {
+  return compute(_sampleOrbitSync, (el, steps, t));
 }

@@ -32,7 +32,6 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
     _load();
   }
 
-
   Future<void> _load() async {
     try {
       final feed = await _neo.getTodayFeed();
@@ -88,9 +87,10 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
     return Scaffold(
       // TODO I might take appBar away
       appBar: AppBar(
-          title: const Text('NEO 3D Orbits '),
-        toolbarTextStyle: TextStyle(
-          fontFamily: 'EVA',
+        title: const Text('NEO 3D Orbits '),
+        titleTextStyle: TextStyle(
+          color: Colors.yellow,
+          fontFamily: 'EVA-Matisse',
           fontWeight: FontWeight.bold,
         ),
         backgroundColor: Colors.black87,
@@ -127,6 +127,12 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
               nodeDescColor: const Color(0xFFFF6B6B),
               nodeRipplePeriodMs: 2400,
               nodeRippleMaxRadiusPx: 24,
+              resetTick: _resetTick,
+              // bump to reset sim
+              onSimDaysChanged: (d) {
+                // report Δt up
+                if (mounted) setState(() => _elapsedDays = d);
+              },
             ),
           ),
           // Legend (optional)
@@ -250,6 +256,7 @@ class _SpeedBtn extends StatelessWidget {
 class _Swatch extends StatelessWidget {
   final Color color;
   final String label;
+
   const _Swatch({required this.color, required this.label});
 
   @override
@@ -281,35 +288,19 @@ class _DetailsSheet3D extends StatelessWidget {
     final name = item.neo.name;
 
     final jplUrl = Uri.parse(
-        'https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=${n.id
-            }');
+        'https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=${n.id}');
     final mpcUrl = Uri.parse(
-        'https://minorplanetcenter.net/db_search/show_object?object_id=${Uri
-            .encodeComponent(name)}');
+        'https://minorplanetcenter.net/db_search/show_object?object_id=${Uri.encodeComponent(name)}');
 
     String _slug(String s) => s
-            .replaceAll(RegExp(r'[()\[\],]'), '')
-            .trim()
-            .toLowerCase()
-            .replaceAll(RegExp(r'\s+'), '-');
+        .replaceAll(RegExp(r'[()\[\],]'), '')
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), '-');
 
-    final spaceRefUrl = Uri.parse(
-        'https://www.spacereference.org/asteroid/${_slug(name)}');
+    final spaceRefUrl =
+        Uri.parse('https://www.spacereference.org/asteroid/${_slug(name)}');
 
-/*
-    // local state for the toggle (Stateless workaround via ValueNotifier)
-    final openInApp = ValueNotifier<bool>(true);
-*/
-
-/*
-    Future<void> _openExt(Uri u) async {
-      final ok = await launchUrl(u, mode: LaunchMode.externalApplication);
-      if (!ok && context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Could not open ${u.host}')));
-      }
-    }
-*/
 
     void _openInApp(SourceTab initial) {
       showModalBottomSheet(
@@ -318,124 +309,40 @@ class _DetailsSheet3D extends StatelessWidget {
         enableDrag: false,
         // WebView owns vertical scroll
         backgroundColor: Colors.transparent,
-        builder: (_) =>
-            SpaceRefWebSheet(
-              title: name,
-              initialSource: initial,
-              // which one to show first
-              spaceRefUrl: spaceRefUrl,
-              jplUrl: jplUrl,
-              mpcUrl: mpcUrl,
-              siteSearchFallbackQuery: name, // SpaceRef slug fallback
-            ),
+        builder: (_) => SpaceRefWebSheet(
+          title: name,
+          initialSource: initial,
+          // which one to show first
+          spaceRefUrl: spaceRefUrl,
+          jplUrl: jplUrl,
+          mpcUrl: mpcUrl,
+          siteSearchFallbackQuery: name, // SpaceRef slug fallback
+        ),
       );
     }
-/* TODO should I keep this
-
-    // Distance now
-    double _heliocentricRAu({
-      required double a,
-      required double e,
-      required double M0deg,
-      required DateTime epochUtc,
-      DateTime? tUtc,
-    }) {
-      tUtc ??= DateTime.now().toUtc();
-      const kGauss = 0.01720209895; // rad/day
-      double meanMotion(double aAu) => kGauss / math.pow(aAu, 1.5);
-      double toRad(double d) => d * math.pi / 180.0;
-      double solveE(double M, double e) {
-        double E = M;
-        for (int i = 0; i < 12; i++) {
-          final f = E - e * math.sin(E) - M;
-          final fp = 1 - e * math.cos(E);
-          E -= f / fp;
-        }
-        return E;
-      }
-
-      final dtDays = tUtc
-          .difference(epochUtc)
-          .inMilliseconds / 86400000.0;
-      final M = toRad(M0deg) + meanMotion(a) * dtDays;
-      final E = solveE(M, e);
-      return a * (1 - e * e) / (1 + e * math.cos(E)); // AU
-    }
-
-    final rNow =
-    _heliocentricRAu(a: el.a, e: el.e, M0deg: el.M, epochUtc: el.epoch);
-*/
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-
-      child: Row(
-        children: [
-          const SizedBox(width: 8),
-          OutlinedButton.icon(
-            onPressed: () => _openInApp(SourceTab.jpl),
-            icon: const Icon(Icons.science_outlined),
-            label: const Text('JPL '),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => _openInApp(SourceTab.spaceRef),
-            icon: const Icon(Icons.auto_stories_outlined),
-            label: const Text('SpaceReference '),
-          ),
-          const SizedBox(width: 8),
-          OutlinedButton.icon(
-            onPressed: () => _openInApp(SourceTab.mpc),
-            icon: const Icon(Icons.public),
-            label: const Text('MPC '),
-          ),
-        ],
-      )
-
-
-    );
-  }
-}
-/*
-
-// Small helper row widget (put below in the same file) TODO Do I need This?
-class _SourceLine extends StatelessWidget {
-  const _SourceLine({
-    required this.button,
-    required this.caption,
-    this.trailing,
-    this.onAlternate,
-  });
-
-  final Widget button;
-  final String caption;
-  final Widget? trailing;
-  final VoidCallback? onAlternate;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(children: [
-          Flexible(child: button),
-          if (trailing != null) ...[
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: [
             const SizedBox(width: 8),
-            trailing!,
+            OutlinedButton.icon(
+              onPressed: () => _openInApp(SourceTab.jpl),
+              icon: const Icon(Icons.science_outlined),
+              label: const Text('JPL '),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => _openInApp(SourceTab.spaceRef),
+              icon: const Icon(Icons.auto_stories_outlined),
+              label: const Text('SpaceReference '),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: () => _openInApp(SourceTab.mpc),
+              icon: const Icon(Icons.public),
+              label: const Text('MPC '),
+            ),
           ],
-        ]),
-        const SizedBox(height: 4),
-        GestureDetector(
-          onLongPress: onAlternate, // e.g., open SpaceRef site search
-          child: Text(
-            caption,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: Colors.white70),
-          ),
-        ),
-      ],
-    );
+        ));
   }
 }
-*/

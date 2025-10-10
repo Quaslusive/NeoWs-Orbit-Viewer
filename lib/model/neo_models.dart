@@ -1,3 +1,35 @@
+import 'dart:math';
+
+/// Gaussian gravitational constant [rad/day], suitable for n ≈ k / a^(3/2) with a in AU.
+const double _GAUSSIAN_K = 0.01720209895;
+
+double _toDouble(dynamic v) =>
+    (v is num) ? v.toDouble() : double.tryParse(v.toString()) ?? 0.0;
+
+double _deg2rad(num d) => d * pi / 180.0;
+double _rad2deg(num r) => r * 180.0 / pi;
+
+/// Convert Julian Day to UTC DateTime.
+DateTime _jdToUtc(double jd) {
+  if (jd <= 0) return DateTime.now().toUtc();
+  final unixSec = (jd - 2440587.5) * 86400.0;
+  return DateTime.fromMillisecondsSinceEpoch(unixSec.round() * 1000, isUtc: true);
+}
+
+/// Parse an epoch from NeoWs fields: prefers ISO string (`epoch_osculation`),
+/// falls back to JD (`epoch_jd`), or `orbit_determination_date`.
+DateTime _parseEpochNeo(Map<String, dynamic> od) {
+  final iso = od['epoch_osculation'] ?? od['epoch'] ?? od['orbit_determination_date'];
+  if (iso != null) {
+    try {
+      return DateTime.parse(iso.toString()).toUtc();
+    } catch (_) {/* fall through */}
+  }
+  final jd = _toDouble(od['epoch_jd']);
+  return _jdToUtc(jd);
+}
+
+/// Your existing lite entry; keep as-is.
 class NeoLite {
   final String id;
   final String name;
@@ -14,45 +46,84 @@ class NeoLite {
   }
 }
 
+/// Normalized orbital elements for rendering/propagation.
+/// - Distances in AU
+/// - Angles in radians
+/// - Mean motion `n` in rad/day
+/// - `epoch` as UTC DateTime
 class OrbitElements {
-  final double a;   // semi-major axis (au)
-  final double e;   // eccentricity
-  final double i;   // inclination (deg)
-  final double omega; // argument of periapsis ω (deg)
-  final double Omega; // longitude of ascending node Ω (deg)
-  final double M;   // mean anomaly at epoch (deg)
-  final DateTime epoch; // epoch_jd or epoch_osculation
+  final double a;     // semi-major axis [AU]
+  final double e;     // eccentricity
+  final double i;     // inclination [rad]
+  final double omega; // argument of periapsis ω [rad]
+  final double Omega; // longitude of ascending node Ω [rad]
+  final double M0;    // mean anomaly at epoch [rad]
+  final DateTime epoch; // UTC
+  final double n;     // mean motion [rad/day]
 
-  OrbitElements({
-    required this.a, required this.e, required this.i,
-    required this.omega, required this.Omega, required this.M,
+  const OrbitElements({
+    required this.a,
+    required this.e,
+    required this.i,
+    required this.omega,
+    required this.Omega,
+    required this.M0,
     required this.epoch,
+    required this.n,
   });
 
-  factory OrbitElements.fromNeo(Map<String, dynamic> m) {
-    final od = m['orbital_data'] as Map<String, dynamic>;
-    // Some fields come as strings → parse carefully
-    double _d(String k) => double.tryParse((od[k] ?? '0').toString()) ?? 0.0;
+  /// Backward-compat degree getters (handy for labels/UI).
+  double get iDeg => _rad2deg(i);
+  double get omegaDeg => _rad2deg(omega);
+  double get OmegaDeg => _rad2deg(Omega);
+  double get MDeg => _rad2deg(M0);
 
-    // epoch as JD → convert to DateTime (rough; good enough for plotting)
-    final jd = double.tryParse((od['epoch_jd'] ?? '0').toString()) ?? 0.0;
-    final epoch = _jdToDate(jd);
-
-    return OrbitElements(
-      a: _d('semi_major_axis'),
-      e: _d('eccentricity'),
-      i: _d('inclination'),
-      omega: _d('perihelion_argument'),
-      Omega: _d('ascending_node_longitude'),
-      M: _d('mean_anomaly'),
-      epoch: epoch,
-    );
+  /// Mean anomaly at time `t` (UTC), with `n` in rad/day.
+  double meanAnomalyAt(DateTime t) {
+    final dtDays = t.difference(epoch).inMilliseconds / 86400000.0;
+    // Wrap to [0, 2π) for neatness
+    final m = M0 + n * dtDays;
+    return m % (2 * pi);
   }
 
-  static DateTime _jdToDate(double jd) {
-    if (jd <= 0) return DateTime.now().toUtc();
-    // JD -> Unix time conversion
-    final unix = ((jd - 2440587.5) * 86400.0).round();
-    return DateTime.fromMillisecondsSinceEpoch(unix * 1000, isUtc: true);
+  /// Create from a NeoWs "lookup" JSON (m), e.g. /neo/rest/v1/neo/{id}
+  /// Also works if you pass m['orbital_data'] directly.
+  factory OrbitElements.fromNeo(Map<String, dynamic> m) {
+    final od = (m['orbital_data'] is Map<String, dynamic>)
+        ? m['orbital_data'] as Map<String, dynamic>
+        : m;
+
+    // NeoWs uses strings for many numbers—parse defensively.
+    final aAu   = _toDouble(od['semi_major_axis']);            // AU
+    final ecc   = _toDouble(od['eccentricity']);
+    final inc   = _deg2rad(_toDouble(od['inclination']));
+
+    // Argument of periapsis can appear under either key:
+    final argp  = _deg2rad(_toDouble(
+      od['perihelion_argument'] ?? od['periastron_argument'],
+    ));
+
+    final asc   = _deg2rad(_toDouble(od['ascending_node_longitude']));
+    final Mdeg  = _toDouble(od['mean_anomaly']);
+    final M0    = _deg2rad(Mdeg);
+
+    // Mean motion may be provided in deg/day; convert to rad/day.
+    final nProvidedDeg = _toDouble(od['mean_motion']);
+    final nRad = (nProvidedDeg != 0.0)
+        ? _deg2rad(nProvidedDeg)
+        : (aAu > 0 ? _GAUSSIAN_K / pow(aAu, 1.5) : 0.0);
+
+    final epoch = _parseEpochNeo(od);
+
+    return OrbitElements(
+      a: aAu,
+      e: ecc,
+      i: inc,
+      omega: argp,
+      Omega: asc,
+      M0: M0,
+      epoch: epoch,
+      n: nRad,
+    );
   }
 }

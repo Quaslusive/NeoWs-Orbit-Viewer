@@ -62,7 +62,7 @@ class Orbit3DCanvas extends StatefulWidget {
       color: Colors.yellow,
       backgroundColor: Colors.black,
       fontSize: 17,
-      fontWeight: FontWeight.w800,
+      fontWeight: FontWeight.bold,
     ),
     this.showShadowPinsAndNodes = true,
     this.orbitShadowOpacity = 0.35,
@@ -132,7 +132,11 @@ class _Orbit3DCanvasState extends State<Orbit3DCanvas>
     with TickerProviderStateMixin {
   late final Ticker _ticker;
   Duration _lastTick = Duration.zero;
-  double _accumMs = 0;
+
+  double _simDays = 0.0; // Δt days since reset
+  int _seenReset = 0;
+
+
 
   double _yaw = 0.0, _pitch = 0.0, _dist = 6.0;
   Offset? _lastDrag;
@@ -153,7 +157,11 @@ class _Orbit3DCanvasState extends State<Orbit3DCanvas>
     _ticker = createTicker((elapsed) {
       final dtMs = (elapsed - _lastTick).inMilliseconds;
       _lastTick = elapsed;
-      if (!widget.paused && dtMs > 0) _accumMs += dtMs;
+
+      if (!widget.paused && dtMs > 0) {
+        _simDays += (dtMs / 1000.0) * widget.simDaysPerSec;
+        widget.onSimDaysChanged?.call(_simDays);
+      }
 
       final now = DateTime.now();
       final canFollow = !_isInteracting &&
@@ -164,29 +172,23 @@ class _Orbit3DCanvasState extends State<Orbit3DCanvas>
 
       if (canFollow) _updateFollowTarget();
 
-      final days = widget.simDaysPerSec * (_accumMs / 1000.0);
-      if (widget.onSimDaysChanged != null) {
-        widget.onSimDaysChanged!(days);
-      }
-      setState(() {});
-    })
-      ..start();
+      setState(() {}); // repaint
+    })..start();
   }
 
+
   @override
-  void didUpdateWidget(covariant Orbit3DCanvas oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.resetTick != oldWidget.resetTick) {
-      // reset sim clock + camera + selection
-      _accumMs = 0;
-      _selectedId = null;
-      _camTarget = const Offset3(0, 0, 0);
-      _dist = 6.0;
-      _yaw = 0.0;
-      _pitch = 0.0;
-      setState(() {});
+  void didUpdateWidget(covariant Orbit3DCanvas old) {
+    super.didUpdateWidget(old);
+    if (widget.resetTick != _seenReset) {
+      _seenReset = widget.resetTick;
+      _simDays = 0.0;
+      widget.onSimDaysChanged?.call(_simDays);
+      _lastTick = Duration.zero; // avoid a giant delta on next tick
     }
   }
+
+
   @override
   void dispose() {
     _ticker.dispose();
@@ -194,10 +196,25 @@ class _Orbit3DCanvasState extends State<Orbit3DCanvas>
   }
 
   DateTime get _simNow {
-    final days = widget.simDaysPerSec * (_accumMs / 1000.0);
+    // _simDays is fractional, so use microseconds
     return DateTime.now()
         .toUtc()
-        .add(Duration(milliseconds: (days * 86400000).round()));
+        .add(Duration(microseconds: (_simDays * 86400000000).round()));
+  }
+
+
+// Compute selected asteroid current world position and ease camera target to it
+// Kepler solver (radians)
+  double _solveKepler(double M, double e) {
+    var E = (e < 0.8) ? M : (M > math.pi ? M - e : M + e);
+    for (int i = 0; i < 10; i++) {
+      final f = E - e * math.sin(E) - M;
+      final fp = 1 - e * math.cos(E);
+      E -= f / fp;
+    }
+    E %= (2 * math.pi);
+    if (E < 0) E += 2 * math.pi;
+    return E;
   }
 
 // Compute selected asteroid current world position and ease camera target to it
@@ -208,18 +225,19 @@ class _Orbit3DCanvasState extends State<Orbit3DCanvas>
         .firstWhere((e) => e!.neo.id == _selectedId, orElse: () => null);
     if (sel == null) return;
 
-    final nuNow = currentTrueAnomaly(
-      aAu: sel.el.a,
-      e: sel.el.e,
-      M0DegAtEpoch: sel.el.M,
-      epochUtc: sel.el.epoch,
-      tUtc: _simNow,
-    );
-    final pNow = orbitPoint3D(
-        sel.el.a, sel.el.e, nuNow, sel.el.omega, sel.el.i, sel.el.Omega);
+    final el = sel.el; // radians/AU model
+    final M  = el.meanAnomalyAt(_simNow);            // rad
+    final E  = _solveKepler(M, el.e);                // rad
+    final nu = 2.0 * math.atan2(
+        math.sqrt(1 + el.e) * math.sin(E / 2.0),
+        math.sqrt(1 - el.e) * math.cos(E / 2.0));    // rad
+
+    // orbitPoint3D(a, e, nu, omega, i, Omega) — all angles in radians, distance in AU
+    final pNow = orbitPoint3D(el.a, el.e, nu, el.omega, el.i, el.Omega);
 
     _camTarget = _lerp3(_camTarget, pNow, _followEase);
   }
+
 
   Offset3 _lerp3(Offset3 a, Offset3 b, double t) => Offset3(
       a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t);
@@ -521,7 +539,7 @@ class _Orbit3DPainter extends CustomPainter {
       final nuNow = currentTrueAnomaly(
         aAu: it.el.a,
         e: it.el.e,
-        M0DegAtEpoch: it.el.M,
+        M0DegAtEpoch: it.el.M0,
         epochUtc: it.el.epoch,
         tUtc: now,
       );
@@ -751,7 +769,7 @@ class _Orbit3DPainter extends CustomPainter {
       final nuNow = currentTrueAnomaly(
         aAu: pl.a,
         e: pl.e,
-        M0DegAtEpoch: pl.M0deg,
+        M0DegAtEpoch: pl.M0,
         epochUtc: pl.epoch,
         tUtc: now,
       );
