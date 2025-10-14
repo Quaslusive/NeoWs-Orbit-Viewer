@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:neows_app/model/asteroid_csv.dart';
+import 'package:neows_app/model/asteroid_model.dart';
 import 'package:neows_app/widget/orbitDiagram2D.dart';
 
 class AsteroidCard extends StatelessWidget {
@@ -8,7 +8,6 @@ class AsteroidCard extends StatelessWidget {
   final String Function(Asteroid) dangerLevel;
   final bool isLoadingAsterank;
 
-  // NEW (optional): pass cached/enriched orbit values from the list page
   final double? orbitA;
   final double? orbitE;
   final bool isOrbitLoading;
@@ -19,9 +18,9 @@ class AsteroidCard extends StatelessWidget {
     required this.onTap,
     required this.dangerLevel,
     this.isLoadingAsterank = false,
-    this.orbitA,                // NEW
-    this.orbitE,                // NEW
-    this.isOrbitLoading = false // NEW
+    this.orbitA,
+    this.orbitE,
+    this.isOrbitLoading = false
   });
 
   @override

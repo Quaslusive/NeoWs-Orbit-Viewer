@@ -52,14 +52,14 @@ class NeoLite {
 /// - Mean motion `n` in rad/day
 /// - `epoch` as UTC DateTime
 class OrbitElements {
-  final double a;     // semi-major axis [AU]
-  final double e;     // eccentricity
-  final double i;     // inclination [rad]
-  final double omega; // argument of periapsis ω [rad]
-  final double Omega; // longitude of ascending node Ω [rad]
-  final double M0;    // mean anomaly at epoch [rad]
+  final double a;       // semi-major axis [AU]
+  final double e;       // eccentricity
+  final double i;       // inclination [rad]
+  final double omega;   // argument of periapsis ω [rad]
+  final double Omega;   // longitude of ascending node Ω [rad]
+  final double M0;      // mean anomaly at epoch [rad]
   final DateTime epoch; // UTC
-  final double n;     // mean motion [rad/day]
+  final double n;       // mean motion [rad/day]
 
   const OrbitElements({
     required this.a,

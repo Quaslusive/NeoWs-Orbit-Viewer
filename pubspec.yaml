@@ -39,12 +39,12 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   fonts:
-    - family: EVA-Matisse
+    - family: EVA-Matisse_Classic
       fonts:
       - asset: lib/assets/fonts/EVA-Matisse/EVA-Matisse_Classic.ttf
-        weight: 400
+    - family: EVA-Matisse_Standard
+      fonts:
       - asset: lib/assets/fonts/EVA-Matisse/EVA-Matisse_Standard.ttf
-        weight: 400
 
   assets:
     - lib/assets/images/icon/icon1.png

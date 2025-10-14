@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 import 'package:neows_app/search/asteroid_filters.dart';
-import 'package:neows_app/model/asteroid_csv.dart';
+import 'package:neows_app/model/asteroid_model.dart';
 
 enum SortKey { size, moid, name, e, a, i }
 

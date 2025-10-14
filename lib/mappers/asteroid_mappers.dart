@@ -1,16 +1,12 @@
 import 'dart:math' as math;
-import 'package:neows_app/model/asteroid_csv.dart';
-import 'package:neows_app/service/asterank_api_service.dart'; // for MpcRow
-
-// ---------------- Helpers ----------------
+import 'package:neows_app/model/asteroid_model.dart';
+import 'package:neows_app/model/neo_models.dart';
 
 // D(km) = 1329/sqrt(p) * 10^(-H/5), p ≈ 0.14 for NEOs
 double _estimateDiameterKmFromH(double h, {double p = 0.14}) {
   if (p <= 0) p = 0.14;
   return 1329.0 / math.sqrt(p) * math.pow(10.0, -h / 5.0) as double;
 }
-
-// ---------------- NeoWs -> Asteroid ----------------
 
 Asteroid asteroidFromNeowsMap(Map<String, dynamic> m) {
   final name = (m['name'] ?? 'Unknown').toString();
@@ -28,7 +24,7 @@ Asteroid asteroidFromNeowsMap(Map<String, dynamic> m) {
     id: name,
     name: name,
     fullName: name,
-    diameter: diameterKm,   // km
+    diameter: diameterKm,
     albedo: 0.0,
     neo: 'Y',
     pha: pha,
@@ -42,7 +38,7 @@ Asteroid asteroidFromNeowsMap(Map<String, dynamic> m) {
   );
 }
 
-// ---------------- MPC (typed: MpcRow) -> Asteroid ----------------
+/* TODO Do I need this?
 
 Asteroid _asteroidFromAsterank(AsterankObject o) {
   final display = o.title.isNotEmpty ? o.title : o.id;
@@ -63,9 +59,8 @@ Asteroid _asteroidFromAsterank(AsterankObject o) {
     i: o.i ?? 0.0,
   );
 }
+*/
 
-
-// If you still need a Map-based MPC mapper (not required if your service returns MpcRow):
 Asteroid asteroidFromMpcMap(Map<String, dynamic> m) {
   final display = (m['readable_des'] ?? m['des'] ?? 'Unknown').toString();
 
@@ -116,7 +111,21 @@ Asteroid asteroidFromMpcMap(Map<String, dynamic> m) {
   );
 }
 
+/// Heuristic hazard flag + mapping to NeoLite
+extension AsteroidToLite on Asteroid {
+  bool get _isHaz {
+    final pha = (this.pha).toUpperCase() == 'Y';
+    final moidRisk = this.moid > 0 && this.moid < 0.05; // AU
+    final big = this.diameter >= 0.14;                  // ~140 m
+    return pha || moidRisk || (pha && big);
+  }
 
-/// Convenience: map a list of MPC items (Map form)
+  NeoLite toNeoLite() => NeoLite(
+    id: id,
+    name: name.isNotEmpty ? name : fullName,
+    isHazardous: _isHaz,
+  );
+}
+
 List<Asteroid> asteroidsFromMpcList(List<Map<String, dynamic>> items) =>
     items.map(asteroidFromMpcMap).toList();

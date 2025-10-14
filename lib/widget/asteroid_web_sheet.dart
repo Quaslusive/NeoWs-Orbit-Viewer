@@ -58,7 +58,7 @@ class _SpaceRefWebSheetState extends State<SpaceRefWebSheet> {
                 'ssl'); // WebResourceErrorType.sslError
             if (isSsl) {
               await _ctrl.loadHtmlString('''
-            <html><body style="background:#0e0e0e;color:#eee;font:14px system-ui; padding:16px">
+            <html lang="en"><body style="background:#0e0e0e;color:#eee;font:14px system-ui; padding:16px">
               <h3 style="margin:0 0 8px">Secure connection failed</h3>
               <p>The website’s certificate isn’t trusted by this device’s WebView.</p>
               <ul>
@@ -261,35 +261,3 @@ class _SpaceRefWebSheetState extends State<SpaceRefWebSheet> {
 }
 
 
-// Tiny header button with "active" look
-class _TabBtn extends StatelessWidget {
-  const _TabBtn({
-    required this.label,
-    required this.icon,
-    required this.active,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = Colors.green;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: TextButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 18, color: fg),
-        label: Text(label),
-        style: TextButton.styleFrom(
-          foregroundColor: fg,
-          backgroundColor: active ? Colors.white10 : Colors.transparent,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-        ),
-      ),
-    );
-  }
-}

@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:neows_app/model/neo_models.dart';
-import 'package:neows_app/model/neo_models.dart';
 
 class Vec3 {
   final double x, y, z;
@@ -60,7 +59,7 @@ List<Vec3> _sampleOrbitSync((OrbitElements el, int steps, DateTime t) args) {
     final M = (M_now + d) % (2 * pi);
 
     final E  = _solveKepler(M, el.e);
-    final cosE = cos(E), sinE = sin(E);
+    final cosE = cos(E);
 
     // distance in AU
     final r = el.a * (1 - el.e * cosE);

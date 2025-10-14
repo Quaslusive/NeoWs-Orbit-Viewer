@@ -7,7 +7,11 @@ import 'package:neows_app/utils/orbit_3d_math.dart';
 import 'package:neows_app/utils/planet_objects.dart';
 
 class Orbit3DItem {
-  Orbit3DItem({required this.neo, required this.el, required this.color});
+  Orbit3DItem({
+    required this.neo,
+    required this.el,
+    required this.color
+  });
 
   final NeoLite neo;
   final OrbitElements el;
@@ -46,7 +50,7 @@ class Orbit3DCanvas extends StatefulWidget {
     this.planetLabelStyle = const TextStyle(
       color: Colors.yellow,
       backgroundColor: Colors.black,
-      fontSize: 15,
+      fontSize: 12,
       fontFamily: 'EVA-Matisse_Standard',
       fontWeight: FontWeight.bold,
     ),
@@ -62,6 +66,7 @@ class Orbit3DCanvas extends StatefulWidget {
       color: Colors.yellow,
       backgroundColor: Colors.black,
       fontSize: 17,
+      fontFamily: 'EVA-Matisse_Standard',
       fontWeight: FontWeight.bold,
     ),
     this.showShadowPinsAndNodes = true,
@@ -75,6 +80,9 @@ class Orbit3DCanvas extends StatefulWidget {
     this.nodeRippleMaxRadiusPx = 26.0,
     this.onSimDaysChanged,
     this.resetTick = 0,
+ //   this.focusObjectId,
+    this.selectById,
+    required Null Function(dynamic it) onLongPressItem,
   });
 
   final List<Orbit3DItem> items;
@@ -124,11 +132,15 @@ class Orbit3DCanvas extends StatefulWidget {
   final void Function(double elapsedDays)? onSimDaysChanged; // emit days elapsed (since app open/reset)
   final int resetTick; // bump this to request a reset
 
+//  final String? focusObjectId;
+
+  final String? selectById;
+
   @override
-  State<Orbit3DCanvas> createState() => _Orbit3DCanvasState();
+  State<Orbit3DCanvas> createState() => Orbit3DCanvasState();
 }
 
-class _Orbit3DCanvasState extends State<Orbit3DCanvas>
+class Orbit3DCanvasState extends State<Orbit3DCanvas>
     with TickerProviderStateMixin {
   late final Ticker _ticker;
   Duration _lastTick = Duration.zero;
@@ -186,7 +198,13 @@ class _Orbit3DCanvasState extends State<Orbit3DCanvas>
       widget.onSimDaysChanged?.call(_simDays);
       _lastTick = Duration.zero; // avoid a giant delta on next tick
     }
-  }
+/*    // NEW: external selection request
+    final newReq = widget.requestSelectId;
+    final oldReq = old.requestSelectId;
+    if (newReq != null && newReq.isNotEmpty && newReq != oldReq) {
+      _selectById(newReq);   // set _selectedId and (optionally) snap camera target
+    }*/
+    }
 
 
   @override
@@ -220,27 +238,88 @@ class _Orbit3DCanvasState extends State<Orbit3DCanvas>
 // Compute selected asteroid current world position and ease camera target to it
   void _updateFollowTarget() {
     if (_selectedId == null) return;
-    final sel = widget.items
-        .cast<Orbit3DItem?>()
-        .firstWhere((e) => e!.neo.id == _selectedId, orElse: () => null);
-    if (sel == null) return;
-
-    final el = sel.el; // radians/AU model
-    final M  = el.meanAnomalyAt(_simNow);            // rad
-    final E  = _solveKepler(M, el.e);                // rad
+    final idx = widget.items.indexWhere((e) => e.neo.id == _selectedId);
+    if (idx < 0) return;
+    final sel = widget.items[idx];
+    final el = sel.el;
+    final M  = el.meanAnomalyAt(_simNow);
+    final E  = _solveKepler(M, el.e);
     final nu = 2.0 * math.atan2(
-        math.sqrt(1 + el.e) * math.sin(E / 2.0),
-        math.sqrt(1 - el.e) * math.cos(E / 2.0));    // rad
-
-    // orbitPoint3D(a, e, nu, omega, i, Omega) — all angles in radians, distance in AU
+      math.sqrt(1 + el.e) * math.sin(E / 2.0),
+      math.sqrt(1 - el.e) * math.cos(E / 2.0),
+    );
     final pNow = orbitPoint3D(el.a, el.e, nu, el.omega, el.i, el.Omega);
-
     _camTarget = _lerp3(_camTarget, pNow, _followEase);
   }
 
 
+
   Offset3 _lerp3(Offset3 a, Offset3 b, double t) => Offset3(
       a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t);
+
+// rename to PUBLIC method
+  void selectById(String id) {
+    final idx = widget.items.indexWhere((e) => e.neo.id == id);
+    if (idx < 0) return;                 // not in the list yet
+    final it = widget.items[idx];
+    final el = it.el;
+
+    _selectedId = id;
+
+    // snap camera to its current position (optional but nice)
+    final t = _simNow;
+    final M = el.meanAnomalyAt(t);
+    final E = _solveKepler(M, el.e);
+    final nu = 2.0 * math.atan2(
+      math.sqrt(1 + el.e) * math.sin(E / 2.0),
+      math.sqrt(1 - el.e) * math.cos(E / 2.0),
+    );
+    final p = orbitPoint3D(el.a, el.e, nu, el.omega, el.i, el.Omega);
+    _camTarget = _lerp3(_camTarget, p, 1.0);
+
+    // let follow resume immediately
+    _isInteracting = false;
+    _lastInteractionAt = DateTime.now().subtract(_resumeDelay * 2);
+
+    if (mounted) setState(() {});
+  }
+
+
+
+// make sure you also import your orbit helpers (where orbitPoint3D lives)
+
+  void _focusOn(String id) {
+    // Find the item
+    final idx = widget.items.indexWhere((it) => it.neo.id == id);
+    if (idx < 0) return;
+    final it = widget.items[idx];
+    final el = it.el;
+
+    // Compute current world position at sim time
+    final t = _simNow;
+    final M = el.meanAnomalyAt(t);     // radians
+    final E = _solveKepler(M, el.e);   // radians
+    final nu = 2.0 * math.atan2(
+      math.sqrt(1 + el.e) * math.sin(E / 2.0),
+      math.sqrt(1 - el.e) * math.cos(E / 2.0),
+    );
+    final p = orbitPoint3D(el.a, el.e, nu, el.omega, el.i, el.Omega); // AU
+
+    // 1) Set selection so your follow logic will keep tracking it
+    _selectedId = id;
+
+    // 2) Snap camera target to that point (1.0 = instant)
+    _camTarget = _lerp3(_camTarget, p, 1.0);
+
+    // 3) Optional: pull camera distance in a bit for clarity
+    _dist = _dist.clamp(3.5, 12.0);
+
+    // 4) Ensure the auto-follow can kick in immediately
+    _isInteracting = false;
+    _lastInteractionAt = DateTime.now().subtract(_resumeDelay * 2);
+
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -536,7 +615,7 @@ class _Orbit3DPainter extends CustomPainter {
       }
 
       // dot
-      final nuNow = currentTrueAnomaly(
+      final nuNow = currentTrueAnomaly( // TODO deprecated
         aAu: it.el.a,
         e: it.el.e,
         M0DegAtEpoch: it.el.M0,
@@ -766,7 +845,7 @@ class _Orbit3DPainter extends CustomPainter {
       );
 
       // Current planet position
-      final nuNow = currentTrueAnomaly(
+      final nuNow = currentTrueAnomaly( // TODO deprecated
         aAu: pl.a,
         e: pl.e,
         M0DegAtEpoch: pl.M0,
@@ -794,7 +873,7 @@ class _Orbit3DPainter extends CustomPainter {
     )..layout(maxWidth: 220);
 
     // soft shadow/outline for legibility
-    final bg = Paint()..color = Colors.black.withValues(alpha: 0.55);
+    final bg = Paint()..color = Colors.black.withValues(alpha: 0.55); // TODO need soft shadows?
     canvas.save();
     canvas.translate(at.dx + 1.2, at.dy + 1.2);
     tp.paint(canvas, Offset.zero);
@@ -806,7 +885,7 @@ class _Orbit3DPainter extends CustomPainter {
   void _drawAsteroidLabel(
       Canvas canvas, Offset at, String name, TextStyle style,
       {double shadowOpacity = 0.55}) {
-    final tp = TextPainter(
+    final tp = TextPainter( // TODO need shadows??
       text: TextSpan(text: name, style: style),
       textDirection: TextDirection.ltr,
     )..layout(maxWidth: 220);

@@ -1,9 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:neows_app/mappers/asteroid_mappers.dart';
+import 'package:neows_app/pages/asteroid_search.dart';
 import 'package:neows_app/service/neoWs_service.dart';
 import 'package:neows_app/utils/planet_objects.dart';
 import 'package:neows_app/widget/asteroid_web_sheet.dart';
 import 'package:neows_app/model/neo_models.dart';
 import 'package:neows_app/widget/orbit_3d_canvas.dart';
+
+import 'package:neows_app/model/asteroid_model.dart'; // for toNeoLite()
+import 'package:neows_app/model/neo_models.dart' show NeoLite, OrbitElements;
+
 
 class TodayOrbits3DPageSoft extends StatefulWidget {
   const TodayOrbits3DPageSoft({super.key, required this.apiKey});
@@ -16,6 +24,7 @@ class TodayOrbits3DPageSoft extends StatefulWidget {
 
 class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
   late final NeoWsService _neo = NeoWsService(apiKey: widget.apiKey);
+  final _canvasKey = GlobalKey<Orbit3DCanvasState>();
   final _items = <Orbit3DItem>[];
   final _cache = <String, OrbitElements>{};
   double _speed = 5.0;
@@ -26,10 +35,30 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
   int _resetTick = 0; // bump to trigger canvas reset
   double _elapsedDays = 0; // shown in the UI
 
+  String? _focusId;
+  String? _centerNotice;
+  Timer? _noticeTimer;
+
+  final _ids = <String>{}; // track which IDs are already in _items
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  void _showCenterNotice(String text) {
+    setState(() => _centerNotice = text);
+    _noticeTimer?.cancel();
+    _noticeTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _centerNotice = null);
+    });
+  }
+
+  @override
+  void dispose() {
+    _noticeTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -75,6 +104,54 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
     );
   }
 
+  Future<void> _addPickedAsteroid() async {
+    final picked = await pickAsteroid(context); // returns Asteroid from the search page
+    if (picked == null) return;
+
+    final neoLite = picked.toNeoLite(); // <-- map once
+
+    // Avoid duplicates fast
+    if (!_ids.add(neoLite.id)) {
+      // Already present — focus and toast instead of adding again
+      _focusId = neoLite.id;
+      _showCenterNotice('${neoLite.name} (redan tillagd)');
+      setState(() {}); // re-render to apply focus/notice
+      return;
+    }
+
+    try {
+      setState(() => _loading = true);
+
+      // OrbitElements cache (radian model)
+      final el = _cache[neoLite.id] ??
+          OrbitElements.fromNeo(await _neo.getNeoById(neoLite.id));
+      _cache[neoLite.id] = el;
+
+      // Choose color once; store in the hot path
+      final color = neoLite.isHazardous ? Colors.redAccent : Colors.cyanAccent;
+
+      _items.add(Orbit3DItem(neo: neoLite, el: el, color: color));
+
+// request selection + optional toast
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _canvasKey.currentState?.selectById(neoLite.id);
+      });
+      _showCenterNotice(neoLite.name);
+
+      setState(() => _loading = false);
+
+    } catch (e) {
+      // rollback ID set if fetch failed
+      _ids.remove(neoLite.id);
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Kunde inte lägga till: $e')),
+      );
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -85,23 +162,45 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
     }
 
     return Scaffold(
-      // TODO I might take appBar away
       appBar: AppBar(
-        title: const Text('NEO 3D Orbits '),
-        titleTextStyle: TextStyle(
-          color: Colors.yellow,
-          fontFamily: 'EVA-Matisse',
-          fontWeight: FontWeight.bold,
-        ),
         backgroundColor: Colors.black87,
         foregroundColor: Colors.yellowAccent,
+        title: const Text(
+          'NEO 3D Orbits',
+          style: TextStyle(
+            color: Colors.yellow,
+            fontFamily: 'EVA-Matisse_Standard',
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),/*
+        actions: [
+          IconButton(
+            tooltip: 'Lägg till asteroid',
+            icon: const Icon(Icons.search),
+            onPressed: _loading
+                ? null
+                : _addPickedAsteroid, // <— lås knappen när vi laddar
+          ),
+        ],*/
       ),
       body: Stack(
         children: [
           Positioned.fill(
             child: Orbit3DCanvas(
+              key: _canvasKey,
               items: _items,
+           //   requestSelectId: _focusId,
               onSelect: _openDetails3D,
+              onLongPressItem: (it) {
+                setState(() {
+                  _items.removeWhere((x) => x.neo.id == it.neo.id);
+                  _cache.remove(it.neo.id);
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Tog bort ${it.neo.name}')),
+                );
+              },
               simDaysPerSec: _speed,
               paused: _paused,
               planets: innerPlanets,
@@ -127,6 +226,7 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
               nodeDescColor: const Color(0xFFFF6B6B),
               nodeRipplePeriodMs: 2400,
               nodeRippleMaxRadiusPx: 24,
+
               resetTick: _resetTick,
               // bump to reset sim
               onSimDaysChanged: (d) {
@@ -135,7 +235,42 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
               },
             ),
           ),
-          // Legend (optional)
+
+          // center toast
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 250),
+                opacity: _centerNotice == null ? 0 : 1,
+                child: Center(
+                  child: _centerNotice == null
+                      ? const SizedBox.shrink()
+                      : Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.black87,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Colors.yellowAccent.withValues(alpha: 0.4)),
+                          ),
+                          child: Text(
+                            _centerNotice!,
+                            style: const TextStyle(
+                              fontFamily: 'EVA-Matisse_Standard',
+                              color: Colors.yellowAccent,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ),
+
+          // Legend (optional) TODO Vad ska jag göra?
+/*
           Positioned(
             left: 12,
             bottom: 72,
@@ -150,6 +285,7 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
                   style: TextStyle(color: Colors.white70)),
             ),
           ),
+*/
 
           // Controls overlay
           Positioned(
@@ -203,13 +339,22 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
                         style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.white,
                             minimumSize: const Size(0, 36)),
+                        onPressed: _loading ? null : _addPickedAsteroid,
+                        icon: const Icon(Icons.search),
+                        label: const Text('Lägg till asteroid'),
+                      ),
+                      // TODO Fixa restet days Snart
+                  /*    OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(0, 36)),
                         onPressed: () => setState(() {
                           _resetTick++;
                           _elapsedDays = 0;
                         }),
                         icon: const Icon(Icons.restart_alt),
                         label: const Text('Reset'),
-                      ),
+                      ),*/
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -253,6 +398,7 @@ class _SpeedBtn extends StatelessWidget {
   }
 }
 
+/* TODO do Im need this??
 class _Swatch extends StatelessWidget {
   final Color color;
   final String label;
@@ -275,6 +421,7 @@ class _Swatch extends StatelessWidget {
     ]);
   }
 }
+*/
 
 class _DetailsSheet3D extends StatelessWidget {
   const _DetailsSheet3D({required this.item});
@@ -284,9 +431,9 @@ class _DetailsSheet3D extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final n = item.neo;
-    final el = item.el;
+    final el = item.el; // TODO Need this?
     final name = item.neo.name;
-
+ // TODO fix netcode:202
     final jplUrl = Uri.parse(
         'https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=${n.id}');
     final mpcUrl = Uri.parse(
@@ -300,7 +447,6 @@ class _DetailsSheet3D extends StatelessWidget {
 
     final spaceRefUrl =
         Uri.parse('https://www.spacereference.org/asteroid/${_slug(name)}');
-
 
     void _openInApp(SourceTab initial) {
       showModalBottomSheet(

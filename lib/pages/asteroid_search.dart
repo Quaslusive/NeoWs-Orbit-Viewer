@@ -6,17 +6,28 @@ import 'package:neows_app/service/asterank_api_service.dart' show AsterankApiSer
 import 'package:neows_app/mappers/asteroid_mappers.dart';
 import 'package:neows_app/search/asteroid_filters.dart';
 import 'package:neows_app/search/asteroid_filter_sheet.dart';
-import 'package:neows_app/model/asteroid_csv.dart';
+import 'package:neows_app/model/asteroid_model.dart';
 import 'package:neows_app/pages/asteroid_details_page.dart';
 import 'package:neows_app/widget/asteroid_card.dart';
 import 'package:neows_app/env/env.dart';
 import 'package:neows_app/service/asteroid_filtering.dart';
 import 'package:neows_app/service/source_caps.dart';
+import 'package:neows_app/model/neo_models.dart';
+
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 
 class AsteroidSearchPage extends StatefulWidget {
-  const AsteroidSearchPage({super.key});
+  const AsteroidSearchPage({
+    super.key,
+    this.pickMode= false ,
+    this.onPick});
+
   @override
   State<AsteroidSearchPage> createState() => _AsteroidSearchPageState();
+
+  final bool pickMode;                 // NEW: acts like a picker when true
+  final ValueChanged<Asteroid>? onPick; // optional callback in pickMode
+
 }
 class _ResultCache {
   final _m = <String, List<Asteroid>>{};
@@ -26,11 +37,14 @@ class _ResultCache {
 }
 
 
+
 class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
-  // Services
+
   late final NeoWsService _neo;
   late final AsterankApiService _asterank;
   final _cache = _ResultCache();
+
+
 
   // cancel stale searches
   int _reqId = 0;
@@ -68,6 +82,16 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
   void dispose() {
     _debounce?.cancel();
     super.dispose();
+  }
+
+  void _onTapAsteroid(Asteroid a) {
+    if (widget.pickMode) {
+      widget.onPick?.call(a);
+      Navigator.of(context).maybePop<Asteroid>(a);
+      return;
+    }
+    // existing behavior when not in pick mode (e.g., push details page)
+    // Navigator.push(...);
   }
 
   Future<void> _openFilters() async {
@@ -216,9 +240,6 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
     }
   }
 
-
-
-
 // AsterankObject -> Asteroid adapter
   Asteroid _asteroidFromAsterank(AsterankObject o) {
     final display = o.title.isNotEmpty ? o.title : o.id;
@@ -239,7 +260,6 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
       i: o.i ?? 0.0,
     );
   }
-
 
   String getDangerLevel(Asteroid a) {
     // NeoWs case: you might have pha + moid
@@ -262,15 +282,36 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sök efter Asteroids')),
+      appBar: AppBar(
+        title: Text(widget.pickMode ? 'Välj asteroid' : 'Sök efter Asteroids'),
+        actions: [
+          if (widget.pickMode)
+            IconButton(
+              tooltip: 'Stäng',
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
+        ],
+      ),
       body: Column(
         children: [
+          // --- (optional) picker hint
+          if (widget.pickMode)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              color: Theme.of(context).colorScheme.secondaryContainer,
+              child: Text(
+                'Tryck på en rad för att välja den här asteroiden',
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+            ),
+
           // Search box
           Padding(
             padding: const EdgeInsets.all(8),
             child: TextField(
-              decoration: const InputDecoration(
-                  labelText: 'Sök asteroid namn'),
+              decoration: const InputDecoration(labelText: 'Sök asteroid namn'),
               onChanged: _onSearchChanged,
             ),
           ),
@@ -284,10 +325,8 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
                   height: 40,
                   child: SegmentedButton<ApiSource>(
                     segments: const [
-                      ButtonSegment(
-                          value: ApiSource.neows, label: Text('NeoWs')),
-                      ButtonSegment(
-                          value: ApiSource.asterank, label: Text('Asterank')),
+                      ButtonSegment(value: ApiSource.neows, label: Text('NeoWs')),
+                      ButtonSegment(value: ApiSource.asterank, label: Text('Asterank')),
                     ],
                     selected: {_source},
                     showSelectedIcon: false,
@@ -313,17 +352,13 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
                 Expanded(
                   child: Text(
                     'Källa: ${_source.label} • Resultat: ${_filtered.length}',
-                    style: Theme
-                        .of(context)
-                        .textTheme
-                        .labelMedium,
+                    style: Theme.of(context).textTheme.labelMedium,
                   ),
                 ),
                 OutlinedButton.icon(
                   onPressed: _openFilters,
                   icon: const Icon(Icons.tune, size: 18),
-                  label: Text(
-                      _filters.isEmpty ? 'Filter' : 'Filter (aktiva)'),
+                  label: Text(_filters.isEmpty ? 'Filter' : 'Filter (aktiva)'),
                 ),
                 if (!_filters.isEmpty)
                   TextButton(
@@ -373,13 +408,11 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
               itemBuilder: (context, index) {
                 final asteroid = _filtered[index];
 
+                // Orbit enrichment (unchanged)
                 final cached = _orbitCache[asteroid.id];
-                final orbitA = cached?.a ??
-                    (asteroid.a > 0 ? asteroid.a : null);
-                final orbitE = cached?.e ??
-                    (asteroid.e > 0 ? asteroid.e : null);
-                final orbitI = cached?.i ??
-                    (asteroid.i > 0 ? asteroid.i : null);
+                final orbitA = cached?.a ?? (asteroid.a > 0 ? asteroid.a : null);
+                final orbitE = cached?.e ?? (asteroid.e > 0 ? asteroid.e : null);
+                final orbitI = cached?.i ?? (asteroid.i > 0 ? asteroid.i : null);
                 final hasOrbit = (orbitA != null && orbitE != null && orbitI != null);
                 if (!hasOrbit) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -395,14 +428,7 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
                   orbitA: orbitA,
                   orbitE: orbitE,
                   isOrbitLoading: _orbitLoading.contains(asteroid.id),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            AsteroidDetailsPage(asteroid: asteroid),
-                      ),
-                    );
-                  },
+                  onTap: () => _onTapAsteroid(asteroid), // <- IMPORTANT
                 );
               },
             ),
@@ -412,6 +438,16 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
     );
   }
 }
+
+Future<Asteroid?> pickAsteroid(BuildContext context) {
+  return showModalBottomSheet<Asteroid>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (_) => const AsteroidSearchPage(pickMode: true),
+  );
+}
+
 class _ActiveFilterSummary extends StatelessWidget {
   final AsteroidFilters f;
   const _ActiveFilterSummary(this.f);

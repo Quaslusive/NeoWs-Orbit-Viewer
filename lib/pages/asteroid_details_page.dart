@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:neows_app/model/asteroid_csv.dart';
+import 'package:neows_app/model/asteroid_model.dart';
 // ✅ MPC service + DTO
 import 'package:neows_app/service/asterank_api_service.dart';
 import 'package:neows_app/widget/orbitDiagram2D.dart';

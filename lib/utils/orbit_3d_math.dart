@@ -1,6 +1,4 @@
 import 'dart:math' as math;
-import 'package:neows_app/utils/mini_3d.dart' hide Offset3;
-
 import 'mini_3d.dart'; // for Offset3
 
 /// Gaussian gravitational constant [rad/day].
