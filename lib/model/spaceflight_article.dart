@@ -1,4 +1,3 @@
-// lib/model/spaceflight_article.dart
 import 'dart:convert';
 
 class SpaceflightArticle {

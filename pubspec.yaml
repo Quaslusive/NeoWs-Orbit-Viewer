@@ -48,8 +48,6 @@ flutter:
 
   assets:
     - lib/assets/images/icon/icon1.png
-    - lib/assets/images/NASA_Worm_logo.svg
-    - lib/assets/orbits/
     - lib/assets/images/orbit_placeholder.png
     - .env
 

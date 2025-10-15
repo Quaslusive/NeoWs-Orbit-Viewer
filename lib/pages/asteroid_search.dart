@@ -7,14 +7,11 @@ import 'package:neows_app/mappers/asteroid_mappers.dart';
 import 'package:neows_app/search/asteroid_filters.dart';
 import 'package:neows_app/search/asteroid_filter_sheet.dart';
 import 'package:neows_app/model/asteroid_model.dart';
-import 'package:neows_app/pages/asteroid_details_page.dart';
 import 'package:neows_app/widget/asteroid_card.dart';
 import 'package:neows_app/env/env.dart';
 import 'package:neows_app/service/asteroid_filtering.dart';
 import 'package:neows_app/service/source_caps.dart';
-import 'package:neows_app/model/neo_models.dart';
 
-import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 
 class AsteroidSearchPage extends StatefulWidget {
   const AsteroidSearchPage({
@@ -25,7 +22,7 @@ class AsteroidSearchPage extends StatefulWidget {
   @override
   State<AsteroidSearchPage> createState() => _AsteroidSearchPageState();
 
-  final bool pickMode;                 // NEW: acts like a picker when true
+  final bool pickMode;
   final ValueChanged<Asteroid>? onPick; // optional callback in pickMode
 
 }
@@ -300,7 +297,7 @@ class _AsteroidSearchPageState extends State<AsteroidSearchPage> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              color: Theme.of(context).colorScheme.secondaryContainer,
+              color: Theme.of(context).colorScheme.surface,
               child: Text(
                 'Tryck på en rad för att välja den här asteroiden',
                 style: Theme.of(context).textTheme.labelMedium,

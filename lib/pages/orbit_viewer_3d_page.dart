@@ -1,28 +1,23 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:neows_app/mappers/asteroid_mappers.dart';
 import 'package:neows_app/pages/asteroid_search.dart';
 import 'package:neows_app/service/neoWs_service.dart';
 import 'package:neows_app/utils/planet_objects.dart';
 import 'package:neows_app/widget/asteroid_web_sheet.dart';
-import 'package:neows_app/model/neo_models.dart';
 import 'package:neows_app/widget/orbit_3d_canvas.dart';
-
-import 'package:neows_app/model/asteroid_model.dart'; // for toNeoLite()
 import 'package:neows_app/model/neo_models.dart' show NeoLite, OrbitElements;
 
 
-class TodayOrbits3DPageSoft extends StatefulWidget {
-  const TodayOrbits3DPageSoft({super.key, required this.apiKey});
-
+class OrbitViewer3DPage extends StatefulWidget {
+  const OrbitViewer3DPage({super.key, required this.apiKey});
   final String apiKey;
 
   @override
-  State<TodayOrbits3DPageSoft> createState() => _TodayOrbits3DPageSoftState();
+  State<OrbitViewer3DPage> createState() => _OrbitViewer3DPageState();
 }
 
-class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
+class _OrbitViewer3DPageState extends State<OrbitViewer3DPage> {
   late final NeoWsService _neo = NeoWsService(apiKey: widget.apiKey);
   final _canvasKey = GlobalKey<Orbit3DCanvasState>();
   final _items = <Orbit3DItem>[];
@@ -99,7 +94,7 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
       enableDrag: true,
       useSafeArea: false,
       barrierColor: Colors.transparent,
-      backgroundColor: Colors.black87,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (_) => _DetailsSheet3D(item: it),
     );
   }
@@ -163,26 +158,79 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.black87,
-        foregroundColor: Colors.yellowAccent,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        foregroundColor:  Theme.of(context).colorScheme.onSurface,
         title: const Text(
           'NEO 3D Orbits',
           style: TextStyle(
-            color: Colors.yellow,
             fontFamily: 'EVA-Matisse_Standard',
             fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
-        ),/*
-        actions: [
-          IconButton(
-            tooltip: 'Lägg till asteroid',
-            icon: const Icon(Icons.search),
-            onPressed: _loading
-                ? null
-                : _addPickedAsteroid, // <— lås knappen när vi laddar
-          ),
-        ],*/
+        ),
+      ),
+      drawer: Drawer(
+        elevation: 100,
+       // shadowColor: Colors.black54,
+        child: Column(
+          children: [
+            DrawerHeader(
+              child: Image.asset(
+                "lib/assets/images/icon/icon1.png",
+                width: 100,
+                height: 100,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.home),
+              title: const Text("Home"),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, "/orbit_viewer_3d_page");
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.search),
+              title: const Text("Sök Asteroider med NeoWs och Asterank"),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, "/asteroid_search");
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.newspaper),
+              title: const Text("News"),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, "/news");
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.info),
+              title: const Text("Acknowledgements"),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, "/acknowledgements_page");
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text("Settings"),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, "/settings_page");
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.rocket),
+              title: const Text("Asteroid Sida"),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, "/asteroid_page");
+              },
+            ),
+          ],
+        ),
       ),
       body: Stack(
         children: [
@@ -249,43 +297,20 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
-                            color: Colors.black87,
+                            color: Theme.of(context).colorScheme.surface,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: Colors.yellowAccent.withValues(alpha: 0.4)),
+                                color: Theme.of(context).colorScheme.onSurface
+                            ),
                           ),
                           child: Text(
                             _centerNotice!,
-                            style: const TextStyle(
-                              fontFamily: 'EVA-Matisse_Standard',
-                              color: Colors.yellowAccent,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
                           ),
                         ),
                 ),
               ),
             ),
           ),
-
-          // Legend (optional) TODO Vad ska jag göra?
-/*
-          Positioned(
-            left: 12,
-            bottom: 72,
-            right: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                  color: Colors.black87,
-                  borderRadius: BorderRadius.circular(12)),
-              child: const Text(
-                  'Pinch = zoom • Drag = orbit camera • Tap a dot',
-                  style: TextStyle(color: Colors.white70)),
-            ),
-          ),
-*/
 
           // Controls overlay
           Positioned(
@@ -295,7 +320,7 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.black87,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -309,7 +334,7 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
                       IconButton(
                         onPressed: () => setState(() => _paused = !_paused),
                         icon: Icon(_paused ? Icons.play_arrow : Icons.pause,
-                            color: Colors.white),
+                          color: Theme.of(context).colorScheme.onSurface,),
                         tooltip: _paused ? 'Play' : 'Pause',
                       ),
                       _SpeedBtn(
@@ -322,9 +347,7 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
                               () => _speed = (_speed - 1).clamp(0, 200))),
                       Chip(
                         label: Text('${_speed.toStringAsFixed(0)} d/s'),
-                        backgroundColor: Colors.white10,
-                        labelStyle: const TextStyle(
-                            color: Colors.black, fontWeight: FontWeight.w700),
+                        backgroundColor: Theme.of(context).colorScheme.surface,
                         visualDensity: VisualDensity.compact,
                       ),
                       _SpeedBtn(
@@ -336,9 +359,6 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
                           onTap: () => setState(
                               () => _speed = (_speed + 20).clamp(0, 200))),
                       OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(0, 36)),
                         onPressed: _loading ? null : _addPickedAsteroid,
                         icon: const Icon(Icons.search),
                         label: const Text('Lägg till asteroid'),
@@ -362,8 +382,6 @@ class _TodayOrbits3DPageSoftState extends State<TodayOrbits3DPageSoft> {
                     alignment: Alignment.centerRight,
                     child: Text(
                       'Δt: ${_elapsedDays.toStringAsFixed(1)} d',
-                      style: const TextStyle(
-                          color: Colors.white70, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],
@@ -386,7 +404,7 @@ class _SpeedBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextButton(
       style: TextButton.styleFrom(
-        foregroundColor: Colors.white,
+        foregroundColor:  Theme.of(context).colorScheme.onSurface,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         minimumSize: const Size(0, 36),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -398,31 +416,6 @@ class _SpeedBtn extends StatelessWidget {
   }
 }
 
-/* TODO do Im need this??
-class _Swatch extends StatelessWidget {
-  final Color color;
-  final String label;
-
-  const _Swatch({required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(children: [
-      Semantics(
-        label: '$label color',
-        child: Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-      ),
-      const SizedBox(width: 6),
-      Text(label),
-    ]);
-  }
-}
-*/
-
 class _DetailsSheet3D extends StatelessWidget {
   const _DetailsSheet3D({required this.item});
 
@@ -433,7 +426,7 @@ class _DetailsSheet3D extends StatelessWidget {
     final n = item.neo;
     final el = item.el; // TODO Need this?
     final name = item.neo.name;
- // TODO fix netcode:202
+ // TODO fix net code:202
     final jplUrl = Uri.parse(
         'https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=${n.id}');
     final mpcUrl = Uri.parse(
@@ -454,7 +447,7 @@ class _DetailsSheet3D extends StatelessWidget {
         isScrollControlled: true,
         enableDrag: false,
         // WebView owns vertical scroll
-        backgroundColor: Colors.transparent,
+        backgroundColor:Theme.of(context).colorScheme.onSurface,
         builder: (_) => SpaceRefWebSheet(
           title: name,
           initialSource: initial,
@@ -471,22 +464,24 @@ class _DetailsSheet3D extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Row(
           children: [
-            const SizedBox(width: 8),
+            const SizedBox(width: 5),
+            // or ElevatedButton
             OutlinedButton.icon(
               onPressed: () => _openInApp(SourceTab.jpl),
               icon: const Icon(Icons.science_outlined),
-              label: const Text('JPL '),
+              label: const Text('JPL'),
             ),
-            ElevatedButton.icon(
+            const SizedBox(width: 5),
+            OutlinedButton.icon(
               onPressed: () => _openInApp(SourceTab.spaceRef),
               icon: const Icon(Icons.auto_stories_outlined),
-              label: const Text('SpaceReference '),
+              label: const Text('SpaceReference'),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 5),
             OutlinedButton.icon(
               onPressed: () => _openInApp(SourceTab.mpc),
               icon: const Icon(Icons.public),
-              label: const Text('MPC '),
+              label: const Text('MPC'),
             ),
           ],
         ));

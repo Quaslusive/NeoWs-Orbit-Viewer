@@ -29,9 +29,9 @@ class AcknowledgementsPage extends StatelessWidget {
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B0E17),
+      backgroundColor:Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0B0E17),
+        backgroundColor:Theme.of(context).colorScheme.surface,
         elevation: 0,
         title: const Text('Acknowledgements'),
       ),
@@ -47,7 +47,7 @@ class AcknowledgementsPage extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.center,
                     colors: [
-                      const Color(0xFF6B7CFF).withOpacity(0.10),
+                      const Color(0xFF6B7CFF).withValues(alpha: 0.10),
                       Colors.transparent,
                     ],
                   ),

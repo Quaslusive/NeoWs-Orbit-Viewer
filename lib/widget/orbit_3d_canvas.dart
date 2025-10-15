@@ -80,7 +80,6 @@ class Orbit3DCanvas extends StatefulWidget {
     this.nodeRippleMaxRadiusPx = 26.0,
     this.onSimDaysChanged,
     this.resetTick = 0,
- //   this.focusObjectId,
     this.selectById,
     required Null Function(dynamic it) onLongPressItem,
   });
@@ -131,8 +130,6 @@ class Orbit3DCanvas extends StatefulWidget {
 
   final void Function(double elapsedDays)? onSimDaysChanged; // emit days elapsed (since app open/reset)
   final int resetTick; // bump this to request a reset
-
-//  final String? focusObjectId;
 
   final String? selectById;
 
