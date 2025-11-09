@@ -5,39 +5,34 @@ import 'package:neows_app/widget/orbitDiagram2D.dart';
 class AsteroidCard extends StatelessWidget {
   final Asteroid a;
   final VoidCallback onTap;
-  final String Function(Asteroid) dangerLevel;
-  final bool isLoadingAsterank;
 
-  final double? orbitA;
-  final double? orbitE;
+
+  final double? orbitA; // semi-major axis (AU)
+  final double? orbitE; // eccentricity
   final bool isOrbitLoading;
+  final bool debugOrbitValues;
 
   const AsteroidCard({
     super.key,
     required this.a,
     required this.onTap,
-    required this.dangerLevel,
-    this.isLoadingAsterank = false,
     this.orbitA,
     this.orbitE,
-    this.isOrbitLoading = false
+    this.isOrbitLoading = false,
+    this.debugOrbitValues = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final danger = dangerLevel(a);
-    final dangerColor = danger.contains('Extreme')
-        ? Colors.red[300]!
-        : danger.contains('Moderate')
-        ? Colors.orange[300]!
-        : Colors.green[300]!;
+    final double? rawA = orbitA ?? a.aAu;
+    final double? rawE = orbitE ?? a.e;
 
-    final hasAsterank = _hasAnyAsterank(a);
+    final double? effE = _eccOrNull(rawE);                 // must be 0<=e<1
+    final double? effA = _positiveOrNull(rawA);            // >0 if present
+    final bool canDraw = _canDrawOrbit(effA, effE);        // OK with e only
 
-    // ---- Orbit values preference: explicit props -> model fields ----
-    final double? effA = orbitA ?? (a.a > 0 ? a.a : null);
-    final double? effE = orbitE ?? (a.e >= 0 && a.e < 1 ? a.e : null);
-    final bool hasOrbit = (effA != null && effA > 0) && (effE != null && effE >= 0 && effE < 1);
+    // Hazard flag (mapper sets isPha)
+    final bool hazardous = a.isPha == true;
 
     return Hero(
       tag: a.id,
@@ -52,44 +47,44 @@ class AsteroidCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // --- Orbit header (now uses effA/effE or shows loading/placeholder) ---
                 SizedBox(
                   height: 100,
                   width: double.infinity,
-                  child: hasOrbit
-                      ? Container(
-                    color: Colors.black12,
+                  child: Container(
+                    color: Colors.grey,
+                    alignment: Alignment.center,
                     padding: const EdgeInsets.all(6),
-                    child: OrbitDiagram2D(
-                      a: effA!,         // AU
-                      e: effE!,         // eccentricity
+                    child: canDraw
+                        ? OrbitDiagram2D(
+                      a: effA ?? 1.0,
+                      e: effE!,
+                      size: 96,
                       stroke: Colors.white,
                       strokeWidth: 2,
                       showPlanets: true,
-                    ),
-                  )
-                      : Container(
-                    color: Colors.black12,
-                    alignment: Alignment.center,
-                    child: isOrbitLoading
+                      backgroundColor: Colors.grey,
+                      placeholderAsset: 'lib/assets/images/PNG_orbit_placeholder.png',
+                    )
+                        : (isOrbitLoading
                         ? const SizedBox(
-                      width: 16, height: 16,
+                      width: 18,
+                      height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                         : Image.asset(
-                      'lib/assets/images/orbit_placeholder.png',
+                      'lib/assets/images/PNG_orbit_placeholder.png',
                       fit: BoxFit.cover,
-                    ),
+                    )),
                   ),
                 ),
 
-                // --- Body ---
+
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Title + risk pill
+
                       Row(
                         children: [
                           Expanded(
@@ -104,64 +99,55 @@ class AsteroidCard extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: dangerColor,
+                              color: hazardous ? Colors.red[300] : Colors.green[300],
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Text(
-                              danger,
+                       /*     child: Text(
+                              hazardous ? 'Hazardous' : 'Not hazardous',
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
-                            ),
+                            ),*/
                           ),
                         ],
                       ),
 
-                      const SizedBox(height: 6),
-
-                      // Quick facts (use effective orbit if available)
-                      Text(
-                        'Class: ${a.classType} • Diam: ${a.diameter.toStringAsFixed(2)} km • '
-                            'MOID: ${a.moid.toStringAsFixed(4)} au • '
-                            'a=${effA?.toStringAsFixed(2) ?? '-'} AU • e=${effE?.toStringAsFixed(2) ?? '-'}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-
-                      // Asterank area
-                      if (hasAsterank || isLoadingAsterank) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            if (hasAsterank)
-                              Expanded(
-                                child: Wrap(
-                                  spacing: 8,
-                                  runSpacing: 6,
-                                  children: [
-                                    if (a.asterankPriceUsd != null)
-                                      _chip(context, 'Value', _compactUsd(a.asterankPriceUsd!)),
-                                    if (a.asterankAlbedo != null)
-                                      _chip(context, 'Albedo', a.asterankAlbedo!.toStringAsFixed(2)),
-                                    if (a.asterankDiameterKm != null)
-                                      _chip(context, 'A.R. Diam', '${a.asterankDiameterKm!.toStringAsFixed(2)} km'),
-                                    if (a.asterankSpec != null && a.asterankSpec!.isNotEmpty)
-                                      _chip(context, 'Type', a.asterankSpec!),
-                                  ],
-                                ),
-                              )
-                            else
-                              const Expanded(child: SizedBox()),
-                            if (isLoadingAsterank) ...[
-                              const SizedBox(width: 8),
-                              const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                            ],
-                          ],
+                      if (debugOrbitValues) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'orbit: a=${_fmt(effA)} e=${_fmt(effE)}  (raw a=${_fmt(rawA)} e=${_fmt(rawE)})',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
                         ),
                       ],
+
+                      const SizedBox(height: 6),
+
+                      // Quick facts
+            /*          Builder(
+                        builder: (_) {
+                          final parts = <String>[];
+                          if (_isFinite(a.H)) parts.add('H: ${a.H!.toStringAsFixed(1)}');
+                          if (_isFinite(a.diameterKm)) {
+                            parts.add('Diameter: ${a.diameterKm!.toStringAsFixed(2)} km');
+                          }
+                          if (_isFinite(a.moidAu)) {
+                            parts.add('MOID: ${a.moidAu!.toStringAsFixed(4)} au');
+                          }
+                          if (_isFinite(effA)) parts.add('a=${effA!.toStringAsFixed(2)} au');
+                          if (_isFinite(effE)) parts.add('e=${effE!.toStringAsFixed(2)}');
+
+                          if (parts.isEmpty) {
+                            return Text(
+                              'No additional data from NeoWs.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            );
+                          }
+                          return Text(
+                            parts.join(' • '),
+                            style: Theme.of(context).textTheme.bodySmall,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          );
+                        },
+                      ),*/
                     ],
                   ),
                 ),
@@ -173,28 +159,25 @@ class AsteroidCard extends StatelessWidget {
     );
   }
 
-  static bool _hasAnyAsterank(Asteroid a) =>
-      a.asterankPriceUsd != null ||
-          a.asterankAlbedo != null ||
-          a.asterankDiameterKm != null ||
-          (a.asterankSpec?.isNotEmpty == true);
+  static bool _isFinite(num? v) => v != null && v.isFinite;
+  static String _fmt(num? v) => v == null ? 'null' : (v.isFinite ? v.toStringAsFixed(3) : 'NaN');
 
-  static Widget _chip(BuildContext context, String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: Theme.of(context).colorScheme.primaryContainer,
-      ),
-      child: Text('$label: $value', style: Theme.of(context).textTheme.labelSmall),
-    );
+  static double? _positiveOrNull(num? v) {
+    if (v == null || !v.isFinite) return null;
+    final d = v.toDouble();
+    return d > 0 ? d : null;
   }
 
-  static String _compactUsd(double n) {
-    if (n >= 1e12) return '\$${(n / 1e12).toStringAsFixed(1)}T';
-    if (n >= 1e9)  return '\$${(n / 1e9).toStringAsFixed(1)}B';
-    if (n >= 1e6)  return '\$${(n / 1e6).toStringAsFixed(1)}M';
-    if (n >= 1e3)  return '\$${(n / 1e3).toStringAsFixed(1)}K';
-    return '\$${n.toStringAsFixed(0)}';
+  static double? _eccOrNull(num? v) {
+    if (v == null || !v.isFinite) return null;
+    final d = v.toDouble();
+    return (d >= 0.0 && d < 1.0) ? d : null;
+  }
+
+  static bool _canDrawOrbit(double? a, double? e) {
+    // valid if we have a valid e; a may be null (fallback 1 AU)
+    final eOk = e != null && e.isFinite && e >= 0.0 && e < 1.0;
+    final aOk = (a == null) || (a.isFinite && a > 0.0);
+    return eOk && aOk;
   }
 }
