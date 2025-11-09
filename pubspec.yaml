@@ -21,7 +21,7 @@ dependencies:
   fl_chart: ^1.1.1
   shared_preferences: ^2.3.2
   cached_network_image: ^3.3.1
-  timeago: ^3.6.1
+#  timeago: ^3.6.1
   webview_flutter: ^4.13.0
   webview_flutter_android: ^4.10.3
   modal_bottom_sheet: ^3.0.0
@@ -49,6 +49,7 @@ flutter:
 
   assets:
     - lib/assets/images/icon/icon1.png
-    - lib/assets/images/orbit_placeholder.png
+    - lib/assets/images/PNG_orbit_placeholder.png
+    - lib/assets/images/SVG_orbit_placeholder.svg
     - .env
 
