@@ -25,6 +25,7 @@ dependencies:
   webview_flutter: ^4.13.0
   webview_flutter_android: ^4.10.3
   modal_bottom_sheet: ^3.0.0
+  package_info_plus: ^8.0.0
 
 
 dev_dependencies:
