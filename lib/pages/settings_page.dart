@@ -1,3 +1,4 @@
+/*
 import 'package:flutter/material.dart';
 import 'package:neows_app/settings/settings_controller.dart';
 import 'package:neows_app/settings/settings_model.dart';
@@ -24,6 +25,9 @@ class SettingsPage extends StatelessWidget {
             ),
           ),
           const Divider(),
+
+          */
+/* TODO No need for .adv stuff
           SwitchListTile(
             title: const Text('Hazardous only'),
             value: s.hazardousOnly,
@@ -68,9 +72,11 @@ class SettingsPage extends StatelessWidget {
                 onChanged: (v) => controller.update(s.copyWith(orbitLineWidth: v)),
               ),
             ),
-          ),
+          ),*//*
+
         ],
       ),
     );
   }
 }
+*/

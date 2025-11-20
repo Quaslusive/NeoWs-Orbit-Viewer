@@ -52,4 +52,8 @@ flutter:
     - lib/assets/images/PNG_orbit_placeholder_White.png
     - lib/assets/images/SVG_orbit_placeholder.svg
     - .env
-
+flutter_icons:
+  android: "launcher_icon"
+  ios: false
+  adaptive_icon_background: "#000000"
+  image_path: "lib/assets/images/PNG_orbit_placeholder_White.png"

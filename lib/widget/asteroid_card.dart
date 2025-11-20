@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:neows_app/model/asteroid_model.dart';
-import 'package:neows_app/widget/orbitDiagram2D.dart';
+import 'package:neows_app/neows/asteroid_model.dart';
+import 'package:neows_app/widget/orbit_diagram2d.dart';
 
 class AsteroidCard extends StatelessWidget {
   final Asteroid a;
   final VoidCallback onTap;
-
-
   final double? orbitA; // semi-major axis (AU)
   final double? orbitE; // eccentricity
   final bool isOrbitLoading;
-  final bool debugOrbitValues;
 
   const AsteroidCard({
     super.key,
@@ -19,7 +16,6 @@ class AsteroidCard extends StatelessWidget {
     this.orbitA,
     this.orbitE,
     this.isOrbitLoading = false,
-    this.debugOrbitValues = false,
   });
 
   @override
@@ -31,7 +27,6 @@ class AsteroidCard extends StatelessWidget {
     final double? effA = _positiveOrNull(rawA);            // >0 if present
     final bool canDraw = _canDrawOrbit(effA, effE);        // OK with e only
 
-    // Hazard flag (mapper sets isPha)
     final bool hazardous = a.isPha == true;
 
     return Hero(
@@ -45,91 +40,75 @@ class AsteroidCard extends StatelessWidget {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             clipBehavior: Clip.antiAlias,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(
-                  height: 100,
+                  height: 90,
                   width: double.infinity,
                   child: Container(
-                    color: Colors.grey,
+                    color: Colors.black87,
                     alignment: Alignment.center,
                     padding: const EdgeInsets.all(6),
                     child: canDraw
                         ? OrbitDiagram2D(
-                      a: effA ?? 1.0,
+                      a: effA!,
                       e: effE!,
-                      size: 96,
-                      stroke: Colors.white,
+                      size: 80,
                       strokeWidth: 2,
                       showPlanets: true,
-                      backgroundColor: Colors.grey,
-                      placeholderAsset: 'lib/assets/images/PNG_orbit_placeholder.png',
+                      backgroundColor: Colors.black87,
                     )
                         : (isOrbitLoading
                         ? const SizedBox(
-                      width: 18,
-                      height: 18,
+                      width: 20,
+                      height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                         : Image.asset(
-                      'lib/assets/images/PNG_orbit_placeholder.png',
+                      'lib/assets/images/PNG_orbit_placeholder_Black.png',
                       fit: BoxFit.cover,
                     )),
                   ),
                 ),
 
-
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  padding: const EdgeInsets.fromLTRB(10, 4, 10, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-
                       Row(
                         children: [
                           Expanded(
                             child: Text(
-                              '${a.name ?? 'Asteroid'} (${a.id})',
-                              maxLines: 1,
+                              a.name ?? 'Asteroid',
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                       //   const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
                             decoration: BoxDecoration(
                               color: hazardous ? Colors.red[300] : Colors.green[300],
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(4),
                             ),
-                       /*     child: Text(
-                              hazardous ? 'Hazardous' : 'Not hazardous',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
-                            ),*/
+                            child: Text(
+                              hazardous ? '⚠️' : '✅',
+                              style: const TextStyle(fontSize: 15),
+                            ),
                           ),
                         ],
                       ),
-
-                      if (debugOrbitValues) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'orbit: a=${_fmt(effA)} e=${_fmt(effE)}  (raw a=${_fmt(rawA)} e=${_fmt(rawE)})',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70),
-                        ),
-                      ],
-
-                      const SizedBox(height: 6),
-
+                      const SizedBox(height: 2),
                       // Quick facts
-            /*          Builder(
+                     Builder(
                         builder: (_) {
                           final parts = <String>[];
                           if (_isFinite(a.H)) parts.add('H: ${a.H!.toStringAsFixed(1)}');
                           if (_isFinite(a.diameterKm)) {
                             parts.add('Diameter: ${a.diameterKm!.toStringAsFixed(2)} km');
-                          }
-                          if (_isFinite(a.moidAu)) {
-                            parts.add('MOID: ${a.moidAu!.toStringAsFixed(4)} au');
                           }
                           if (_isFinite(effA)) parts.add('a=${effA!.toStringAsFixed(2)} au');
                           if (_isFinite(effE)) parts.add('e=${effE!.toStringAsFixed(2)}');
@@ -141,13 +120,13 @@ class AsteroidCard extends StatelessWidget {
                             );
                           }
                           return Text(
-                            parts.join(' • '),
+                            parts.join('\n'),
                             style: Theme.of(context).textTheme.bodySmall,
-                            maxLines: 2,
+                            maxLines: 5,
                             overflow: TextOverflow.ellipsis,
                           );
                         },
-                      ),*/
+                      ),
                     ],
                   ),
                 ),

@@ -1,38 +1,51 @@
 import 'package:flutter/material.dart';
 
-enum DistanceUnit { km, mi }
-enum AppTheme { system, light, dark }
+enum AppTheme { light, dark, system }
+enum AppFont { system, evaStandard, /*evaClassic*/ }
 
+@immutable
 class SettingsModel {
-  final DistanceUnit unit;
-  final int defaultDays;          // for /feed date range
-  final bool hazardousOnly;
-  final bool showEclipticGrid;
-  final double orbitLineWidth;    // 1.0–4.0
   final AppTheme theme;
+  final AppFont font;
+  final bool invertY;
+  final bool showAxes;
+  final bool showGrid;
+  final bool showOrbits;
+  final double rotateSens; // 0.002–0.030
+  final double zoomSens;   // 0.01–0.20
+
 
   const SettingsModel({
-    this.unit = DistanceUnit.km,
-    this.defaultDays = 3,
-    this.hazardousOnly = false,
-    this.showEclipticGrid = true,
-    this.orbitLineWidth = 1.5,
     this.theme = AppTheme.system,
+    this.font = AppFont.system,
+    this.invertY = false,
+    this.showAxes = false,
+    this.showGrid = true,
+    this.showOrbits = true,
+    this.rotateSens = 0.010,
+    this.zoomSens = 0.06,
+
   });
 
   SettingsModel copyWith({
-    DistanceUnit? unit,
-    int? defaultDays,
-    bool? hazardousOnly,
-    bool? showEclipticGrid,
-    double? orbitLineWidth,
     AppTheme? theme,
-  }) => SettingsModel(
-    unit: unit ?? this.unit,
-    defaultDays: defaultDays ?? this.defaultDays,
-    hazardousOnly: hazardousOnly ?? this.hazardousOnly,
-    showEclipticGrid: showEclipticGrid ?? this.showEclipticGrid,
-    orbitLineWidth: orbitLineWidth ?? this.orbitLineWidth,
-    theme: theme ?? this.theme,
-  );
+    AppFont? font,
+    bool? invertY,
+    bool? showAxes,
+    bool? showGrid,
+    bool? showOrbits,
+    double? rotateSens,
+    double? zoomSens,
+  }) {
+    return SettingsModel(
+      theme: theme ?? this.theme,
+      font: font ?? this.font,
+      invertY: invertY ?? this.invertY,
+      showAxes: showAxes ?? this.showAxes,
+      showGrid: showGrid ?? this.showGrid,
+      showOrbits: showOrbits ?? this.showOrbits,
+      rotateSens: rotateSens ?? this.rotateSens,
+      zoomSens: zoomSens ?? this.zoomSens,
+    );
+  }
 }

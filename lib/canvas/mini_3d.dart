@@ -5,11 +5,11 @@ class Camera3D {
   Camera3D({
     required this.fovYDeg,
     required this.aspect,
-    this.near = 0.1,
-    this.far = 1000.0,
-    this.position = const Offset3(0, 0, 6), // camera at +Z looking toward target (typically -Z)
-    this.target = const Offset3(0, 0, 0),
-    this.up = const Offset3(0, 1, 0),
+    this.near = 0.001,
+    this.far  = 50.0,
+    this.position = const Offset3(0, 0, 6),
+    this.target   = const Offset3(0, 0, 0),
+    this.up       = const Offset3(0, 1, 0),
   });
 
   double fovYDeg;
@@ -21,14 +21,15 @@ class Camera3D {
   List<double> get viewMatrix {
     // Normalize up to avoid skew if user passes a scaled vector
     final upN = up.normalized();
-
     final f = (target - position).normalized(); // forward (toward -Z if target is in front)
     // If up is nearly parallel to f, fix it (rare but prevents NaNs)
     Offset3 s = f.cross(upN);
     if (s.len < 1e-9) {
       // choose an arbitrary orthogonal up
-      final fallbackUp = (math.cos(f.y) < 0.99) ? const Offset3(0,1,0) : const Offset3(1,0,0);
-      s = f.cross(fallbackUp);
+      final worldUp = (f.y.abs() > 0.99) ? const Offset3(1,0,0) : const Offset3(0,1,0);
+     // final fallbackUp = (math.cos(f.y) < 0.99) ? const Offset3(0,1,0) : const Offset3(1,0,0);
+     s = f.cross(worldUp);
+      // s = f.cross(fallbackUp);
     }
     s = s.normalized();
     final u = s.cross(f); // already orthonormal
@@ -44,9 +45,12 @@ class Camera3D {
 
   // Column-major RH perspective projection (OpenGL-style z in [-1,1])
   List<double> get projMatrix {
-    final fov = fovYDeg * math.pi / 180.0;
+    final fov = (fovYDeg.clamp(1e-3, 179.0)) * math.pi / 180.0; // avoid tan blow-ups
     final t = math.tan(fov / 2.0);
-    final a = (aspect == 0) ? 1e-9 : aspect;
+    final a = (aspect <= 0) ? 1e-9 : aspect;
+/*    final fov = fovYDeg * math.pi / 180.0;
+    final t = math.tan(fov / 2.0);
+    final a = (aspect == 0) ? 1e-9 : aspect;*/
     // near/far guards
     final n = (near <= 0) ? 1e-3 : near;
     final f = (far <= n + 1e-6) ? n + 1.0 : far;
@@ -80,34 +84,49 @@ class Offset3 {
 
 /// Project a world-space point to screen. Returns null if behind the camera.
 Offset? projectVec(Offset3 v, Camera3D cam, Size size) {
-  // Multiply column-major matrices with column vectors
-  Offset3 mulMat(List<double> m, Offset3 p, {double w = 1}) {
-    return Offset3(
-      m[0] * p.x + m[4] * p.y + m[8]  * p.z + m[12] * w,
-      m[1] * p.x + m[5] * p.y + m[9]  * p.z + m[13] * w,
-      m[2] * p.x + m[6] * p.y + m[10] * p.z + m[14] * w,
-    );
-  }
+  final pv = mulMat4(cam.projMatrix, cam.viewMatrix);
 
-  // World -> View -> Clip
-  final vCam  = mulMat(cam.viewMatrix, v);
-  final vClip = mulMat(cam.projMatrix, vCam, w: 1);
+  final clip = mul4(pv, _Vec4(v.x, v.y, v.z, 1.0));
+  final w = clip.w;
 
-  // Compute w' = last row dot [x y z 1]^T
-  final pm = cam.projMatrix;
-  final wPrime = (pm[3] * vCam.x + pm[7] * vCam.y + pm[11] * vCam.z + pm[15] * 1.0);
+  if (!w.isFinite || w <= 0) return null; // behind camera
 
-  // Behind camera or invalid
-  if (!wPrime.isFinite || wPrime <= 0) return null;
-
-  final ndcX = vClip.x / wPrime; // -1..1
-  final ndcY = vClip.y / wPrime;
-
-  // Optional quick clip test: skip things far off-screen
+  final ndcX = clip.x / w;
+  final ndcY = clip.y / w;
   if (!ndcX.isFinite || !ndcY.isFinite) return null;
 
-  // NDC -> screen
   final x = (ndcX * 0.5 + 0.5) * size.width;
   final y = (1.0 - (ndcY * 0.5 + 0.5)) * size.height;
   return Offset(x, y);
+}
+
+class _Vec4 {
+  final double x,y,z,w;
+  const _Vec4(this.x,this.y,this.z,this.w);
+}
+
+_Vec4 mul4(List<double> m, _Vec4 v) {
+  // column-major: m[c*4 + r]
+  return _Vec4(
+    m[0]*v.x + m[4]*v.y + m[8]*v.z  + m[12]*v.w,
+    m[1]*v.x + m[5]*v.y + m[9]*v.z  + m[13]*v.w,
+    m[2]*v.x + m[6]*v.y + m[10]*v.z + m[14]*v.w,
+    m[3]*v.x + m[7]*v.y + m[11]*v.z + m[15]*v.w,
+  );
+}
+
+///  precompute PV to reduce allocations:
+List<double> mulMat4(List<double> a, List<double> b) {
+  // column-major 4x4 * 4x4
+  final r = List<double>.filled(16, 0.0);
+  for (int c = 0; c < 4; c++) {
+    for (int rIdx = 0; rIdx < 4; rIdx++) {
+      r[c*4 + rIdx] =
+          a[0*4 + rIdx]*b[c*4 + 0] +
+              a[1*4 + rIdx]*b[c*4 + 1] +
+              a[2*4 + rIdx]*b[c*4 + 2] +
+              a[3*4 + rIdx]*b[c*4 + 3];
+    }
+  }
+  return r;
 }

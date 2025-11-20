@@ -4,15 +4,14 @@ import 'package:flutter/material.dart';
 // Gaussian gravitational constant [rad/day]
 const double _kGauss = 0.01720209895;
 
-// J2000 epoch (~UTC is fine for visualization)
+// J2000 epoch
 final DateTime _j2000 = DateTime.utc(2000, 1, 1, 12, 0, 0);
 
-// Helper
 double _deg2rad(num d) => d * math.pi / 180.0;
 
 /// Radian-native planet elements for rendering/propagation.
-///
-/// All angles are **radians**, distances **AU**, n in **rad/day**.
+/// Frame: heliocentric ecliptic J2000.
+/// All angles are radians, distances AU, n in rad/day
 class Planet {
   final String name;
   final double a;      // AU
@@ -74,8 +73,9 @@ class Planet {
     );
   }
 
-  /// Mean anomaly at time `tUtc` (radians).
-  double meanAnomalyAt(DateTime tUtc) {
+  /// Mean anomaly at time
+  double meanAnomalyAt(DateTime t) {
+    final tUtc = t.toUtc();
     final dtDays = tUtc.difference(epoch).inMilliseconds / 86400000.0;
     var m = (M0 + n * dtDays) % (2 * math.pi);
     if (m < 0) m += 2 * math.pi;
@@ -83,18 +83,18 @@ class Planet {
   }
 }
 
-// ----------------- COLORS -----------------
-const _mercury = Color(0xFF9E9E9E);
-const _venus   = Color(0xFFEED6A3);
-const _earth   = Color(0xFF66CCFF);
-const _mars    = Color(0xFFE07A5F);
+/// https://www.color-hex.com/color-palette/7174
+const _mercury = Color(0xFFADA8A5);
+const _venus   = Color(0xFFD3A567);
+const _earth   = Color(0xFF0047D8);
+const _mars    = Color(0xFFC1440E);
 const _jupiter = Color(0xFFDAB07E);
-const _saturn  = Color(0xFFF3E2A9);
-const _uranus  = Color(0xFF6AD2C9);
-const _neptune = Color(0xFF5CA2F1);
+const _saturn  = Color(0xFFEDDBAD);
+const _uranus  = Color(0xFF62AEE7);
+const _neptune = Color(0xFF3D5EF9);
+// const _test = Colors.pink;
 
-// ----------------- DATA -----------------
-// Your original element values were degrees; we now call Planet.deg(...)
+
 final List<Planet> innerPlanets = [
   Planet.deg(
     name: 'Mercury',
@@ -192,4 +192,16 @@ final List<Planet> innerPlanets = [
     color: _neptune,
     radiusPx: 4.5,
   ),
+/*  Planet.deg(
+    name: 'DEATH STAR MKIII',
+    a: 15.1104,
+    e: 0.048988,
+    iDeg: 1.790,
+    omegaDeg: 273.336,
+    OmegaDeg: 121.784,
+    M0Deg: 276.228,
+    epoch: _j2000,
+    color: _test,
+    radiusPx: 10.5,
+  ),*/
 ];

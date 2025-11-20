@@ -1,3 +1,4 @@
+/* todo Will implement filters sometime in the future, cuz its a pain
 import 'package:flutter/material.dart';
 import 'package:neows_app/search/asteroid_filters.dart';
 
@@ -100,7 +101,7 @@ class _AsteroidFilterSheetState extends State<AsteroidFilterSheet> {
 
   void _applyAndClose() {
     Navigator.of(context).pop<AsteroidFilters>(f.copyWith(
-      query: _queryCtl.text.trim(),                    // non-nullable
+      query: _queryCtl.text.trim(),
       maxMoidAu: _parseDouble(_moidCtl.text),
       minArcDays: _parseInt(_minArcCtl.text),
       maxUncertaintyU: _boundInt(_parseInt(_maxUctl.text), 0, 9),
@@ -429,3 +430,4 @@ class _AsteroidFilterSheetState extends State<AsteroidFilterSheet> {
     );
   }
 }
+*/

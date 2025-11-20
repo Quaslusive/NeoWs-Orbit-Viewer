@@ -1,5 +1,6 @@
+/*
 import 'package:flutter/material.dart';
-import 'package:neows_app/service/source_caps.dart'; // add this at the top of the file
+import 'package:neows_app/service/source_caps.dart';
 
 class DoubleRange {
   final double? min;
@@ -12,33 +13,30 @@ class DoubleRange {
 }
 
 class AsteroidFilters {
-  // Text search
   final String query; // non-nullable; empty means "no query"
 
-  // Time window for approaches / NeoWs feed
   final DateTimeRange? window;
 
-  // Ranges (use consistent units!)
-  // Distances: km, MOID: au, Velocity: km/s, Diameter: km
+  // Ranges
   final DoubleRange? missDistanceKm;
   final DoubleRange? relVelKms;
   final DoubleRange? diameterKm;
-  final DoubleRange? hMag;      // absolute magnitude
-  final DoubleRange? e;         // eccentricity
-  final DoubleRange? aAu;       // semi-major axis in au
-  final DoubleRange? iDeg;      // inclination in degrees
-  final DoubleRange? moidAu;    // MOID in au
+  final DoubleRange? hMag;
+  final DoubleRange? e;
+  final DoubleRange? aAu;
+  final DoubleRange? iDeg;
+  final DoubleRange? moidAu;
 
   // Other numeric filters
-  final double? maxMoidAu;        // deprecated by moidAu?.max, but kept if you want a simple slider
-  final int?    maxUncertaintyU;  // 0..9 (orbit uncertainty)
-  final int?    minArcDays;       // observation arc length days
-  final int     limit;            // clamp 10–1000
+  final double? maxMoidAu;
+  final int?    maxUncertaintyU;
+  final int?    minArcDays;
+  final int     limit;
 
   // Flags/sets
-  final bool phaOnly;                 // potentially hazardous only
-  final Set<String> orbitClasses;     // e.g., {'Apollo','Aten','Amor','Atira'}
-  final String? targetBody;           // e.g., 'Earth','Mars'
+  final bool phaOnly;
+  final Set<String> orbitClasses;
+  final String? targetBody;
 
   const AsteroidFilters({
     this.query = '',
@@ -51,7 +49,7 @@ class AsteroidFilters {
     this.aAu,
     this.iDeg,
     this.moidAu,
-    this.maxMoidAu,       // if you keep this, it will be applied in addition to moidAu
+    this.maxMoidAu,
     this.maxUncertaintyU,
     this.minArcDays,
     this.limit = 50,
@@ -121,11 +119,11 @@ class AsteroidFilters {
   AsteroidFilters reset() => const AsteroidFilters();
 }
 
-// Sane bounds for UI controls (match the units above)
+
 class FilterBounds {
   static const double missKmMax = 20000000.0; // ~52 LD
   static const double relVelMax = 50.0;         // km/s
-  static const double diamMaxKm = 3000.0;      // 3,000 km (overkill, but safe upper)
+  static const double diamMaxKm = 3000.0;      // 3,000 km
   static const double hMin = 10.0, hMax = 30.0;
   static const double eMax = 1.0;
   static const double aMax = 6.0;               // au
@@ -133,11 +131,9 @@ class FilterBounds {
   static const double moidMax = 1.0;            // au
   static const int arcMaxDays = 60000;         // ~164 years
 }
-// lib/search/asteroid_filters.dart
 
 extension ProjectFilters on AsteroidFilters {
-  /// Returns a version of this filter set that only contains fields
-  /// supported by the given source. Others are nulled/disabled.
+
   AsteroidFilters forSource(ApiSource src) {
     final c = src.caps;
     return copyWith(
@@ -146,14 +142,13 @@ extension ProjectFilters on AsteroidFilters {
       relVelKms:        c.supportsCloseApproach  ? relVelKms        : null,
       // hazard
       phaOnly:          c.supportsHazardFlag     ? phaOnly          : false,
-      // orbit elems + search text are fine for both
-      // moidAu/a/e/i kept as-is
+
     );
   }
 
-  /// Count only fields that survive projection for this source.
   // int activeCountFor(ApiSource src) => forSource(src).activeCount;
 }
 
 
 
+*/

@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show DateTimeRange;
 import 'package:http/http.dart' as http;
-import 'package:neows_app/model/asteroid_model.dart';
-import 'package:neows_app/mappers/asteroid_mappers.dart';
+import 'package:neows_app/neows/asteroid_model.dart';
+import 'package:neows_app/neows/asteroid_mappers.dart';
 
 typedef JsonMap = Map<String, dynamic>;
 
@@ -111,7 +111,6 @@ class NeoWsService {
     }
     return out;
   }
-
   Future<List<Asteroid>> search(String term, {int limit = 50}) async {
     final rows = await rawSearch(term, limit: limit);
     return rows.map(asteroidFromBrowseOrLookup).toList(growable: false);

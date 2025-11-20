@@ -1,5 +1,6 @@
 import 'dart:math' as math;
-import 'mini_3d.dart'; // for Offset3
+import 'package:neows_app/canvas/mini_3d.dart';
+
 
 /// Gaussian gravitational constant [rad/day].
 const double kGauss = 0.01720209895;
@@ -9,7 +10,6 @@ double meanMotionFromA(double aAu) => kGauss / math.pow(aAu, 1.5);
 
 /// Kepler solver: E - e sinE = M (all radians)
 double solveE(double M, double e) {
-  // solid initial guess helps convergence
   double E = (e < 0.8) ? M : (M > math.pi ? M - e : M + e);
   for (int i = 0; i < 12; i++) {
     final f  = E - e * math.sin(E) - M;
@@ -42,17 +42,16 @@ double trueAnomalyNow({
   );
 }
 
-/// 3D point in ECI/ecliptic frame from orbital elements at given ν (all radians).
-/// Distances are in AU. No degree conversions here.
-Offset3 orbitPoint3D(double a, double e, double nu, double omega, double i, double Omega) {
-  // radius in AU (equivalent to a*(1-e*cosE) but using ν form)
+/// 3D point in heliocentric ecliptic J2000 from orbital elements at given ν (all radians).
+/// Distances are in AU.
+Offset3 orbitPoint3D(double a, double e, double nu, double omega, double i, double Omega) {  // radius in AU (equivalent to a*(1-e*cosE) but using ν form)
   final r = a * (1 - e * e) / (1 + e * math.cos(nu));
 
   // perifocal coordinates (z = 0)
   final xp = r * math.cos(nu);
   final yp = r * math.sin(nu);
 
-  // rotation matrix from perifocal -> ECI using Ω, i, ω (all radians)
+  // rotation matrix from perifocal -> ECI using Ω, i, ω
   final cO = math.cos(Omega), sO = math.sin(Omega);
   final ci = math.cos(i),     si = math.sin(i);
   final cw = math.cos(omega), sw = math.sin(omega);
@@ -67,41 +66,7 @@ Offset3 orbitPoint3D(double a, double e, double nu, double omega, double i, doub
   final x = r11 * xp + r12 * yp;
   final y = r21 * xp + r22 * yp;
   final z = r31 * xp + r32 * yp;
+// debugPrint('x: $x'  'y: $y' 'z: $z');
 
-  // If your renderer expects z-up feel (swap y/z), keep the swap:
-  return Offset3(x, z, y);
-}
-
-/* ---------------------------
-   OPTIONAL: compatibility shims
-   Keep temporarily if some old callsites still pass DEGREES.
-   Remove once all callers use radians.
-----------------------------*/
-
-double _toRad(double d) => d * math.pi / 180.0;
-
-/// Old signature -> new (degrees in)
-@deprecated
-double currentTrueAnomaly({
-  required double aAu,
-  required double e,
-  required double M0DegAtEpoch,
-  required DateTime epochUtc,
-  required DateTime tUtc,
-}) {
-  final n = meanMotionFromA(aAu); // best-effort if you don't have el.n
-  return trueAnomalyNow(
-    aAu: aAu,
-    e: e,
-    M0: _toRad(M0DegAtEpoch),
-    n: n,
-    epochUtc: epochUtc,
-    tUtc: tUtc,
-  );
-}
-
-/// Old degree-based point -> new radian version
-@deprecated
-Offset3 orbitPoint3Ddeg(double a, double e, double nuDeg, double omegaDeg, double iDeg, double OmegaDeg) {
-  return orbitPoint3D(a, e, _toRad(nuDeg), _toRad(omegaDeg), _toRad(iDeg), _toRad(OmegaDeg));
+ return Offset3(x, z, y);
 }

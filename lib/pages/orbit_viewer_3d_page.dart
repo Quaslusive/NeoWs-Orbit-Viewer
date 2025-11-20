@@ -1,17 +1,30 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:neows_app/mappers/asteroid_mappers.dart';
-import 'package:neows_app/pages/asteroid_search.dart';
-import 'package:neows_app/service/neoWs_service.dart';
-import 'package:neows_app/utils/planet_objects.dart';
-import 'package:neows_app/widget/asteroid_web_sheet.dart';
-import 'package:neows_app/widget/orbit_3d_canvas.dart';
-import 'package:neows_app/model/neo_models.dart' show NeoLite, OrbitElements;
+import 'package:neows_app/neows/asteroid_mappers.dart';
+import 'package:neows_app/pages/asteroid_search_page.dart';
+import 'package:neows_app/neows/neows_service.dart';
+import 'package:neows_app/neows/asteroid_controller.dart';
+import 'package:neows_app/settings/settings_controller.dart';
+import 'package:neows_app/canvas/planet_objects.dart';
+import 'package:neows_app/space_reference_web/space_ref_sheet.dart';
+import 'package:neows_app/canvas/orbit_3d_canvas.dart';
+import 'package:neows_app/neows/neo_models.dart' show OrbitElements;
+import 'package:neows_app/neows/asteroid_repository.dart';
+import 'package:neows_app/quick_add/quick_add_sheet.dart';
+// import 'package:package_info_plus/package_info_plus.dart';
+import 'package:neows_app/quick_add/quick_add_action.dart';
+import 'package:neows_app/widget/side_menu.dart';
 
 
 class OrbitViewer3DPage extends StatefulWidget {
-  const OrbitViewer3DPage({super.key, required this.apiKey});
   final String apiKey;
+  final SettingsController controller;
+
+  const OrbitViewer3DPage({
+    super.key,
+    required this.apiKey,
+    required this.controller,
+  });
 
   @override
   State<OrbitViewer3DPage> createState() => _OrbitViewer3DPageState();
@@ -19,27 +32,64 @@ class OrbitViewer3DPage extends StatefulWidget {
 
 class _OrbitViewer3DPageState extends State<OrbitViewer3DPage> {
   late final NeoWsService _neo = NeoWsService(apiKey: widget.apiKey);
+  late final AsteroidRepository _repo = AsteroidRepository(_neo);
+  late final AsteroidController _ctrl;
   final _canvasKey = GlobalKey<Orbit3DCanvasState>();
   final _items = <Orbit3DItem>[];
   final _cache = <String, OrbitElements>{};
   double _speed = 5.0;
   bool _paused = false;
-  bool _loading = true;
+  bool _loading = false;
   String? _err;
-
-  int _resetTick = 0; // bump to trigger canvas reset
   double _elapsedDays = 0; // shown in the UI
-
   String? _focusId;
   String? _centerNotice;
   Timer? _noticeTimer;
 
+  Orbit3DItem? _selectedItem;
+ // String? _appVersion;
+
+  // control state
+  double _minDist = 2.0;
+  double _maxDist = 50.0;
+
   final _ids = <String>{}; // track which IDs are already in _items
+ // final Set<String> _shownAsteroidIds = <String>{};
+  bool _busy = false;
+
+  String _simDateString() {
+    final base = DateTime.now();
+    final ms = (_elapsedDays * 24 * 60 * 60 * 1000).round();
+    final d = base.add(Duration(milliseconds: ms));
+    String two(int x) => x.toString().padLeft(2, '0');
+    return '${d.year}-${two(d.month)}-${two(d.day)}';
+  }
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _ctrl = AsteroidController(
+      repo: _repo,
+      ids: _ids,
+      onNotice: _showCenterNotice,
+      addItem: (it) {
+        _items.add(it);
+        // auto select
+        /*   if (mounted) setState(() {});
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _canvasKey.currentState?.selectedId(it.neo.id);
+        });*/
+      },
+      setBusy: (b) {
+        if (!mounted) return;
+        setState(() => _busy = b);
+      },
+    );
+    _initPlanetsOnly();
+    //_loadAppVersion();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _canvasKey.currentState?.resetSimulation();
+    });
   }
 
   void _showCenterNotice(String text) {
@@ -56,99 +106,104 @@ class _OrbitViewer3DPageState extends State<OrbitViewer3DPage> {
     super.dispose();
   }
 
-  Future<void> _load() async {
-    try {
-      final feed = await _neo.getTodayFeed();
-      final list = feed.map(NeoLite.fromFeed).toList();
-
-      // Fetch with limited concurrency
-      const maxC = 4;
-      for (int i = 0; i < list.length; i += maxC) {
-        final batch =
-            list.sublist(i, (i + maxC < list.length) ? i + maxC : list.length);
-        await Future.wait(batch.map((n) async {
-          final el = OrbitElements.fromNeo(await _neo.getNeoById(n.id));
-          _cache[n.id] = el;
-          _items.add(Orbit3DItem(
-            neo: n,
-            el: el,
-            color: n.isHazardous ? Colors.redAccent : Colors.cyanAccent,
-          ));
-        }));
-        setState(() {}); // progressive paint
-      }
-      setState(() => _loading = false);
-    } catch (e) {
-      setState(() {
-        _err = e.toString();
-        _loading = false;
-      });
-    }
+  void _initPlanetsOnly() {
+    _items.clear();
+    _ids.clear();
+    _cache.clear();
+    _elapsedDays = 0;
+    _err = null;
+    _loading = false;
   }
 
-  void _openDetails3D(Orbit3DItem it) {
+  void _openQuickAddSheet() {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: false,
       showDragHandle: true,
-      enableDrag: true,
-      useSafeArea: false,
-      barrierColor: Colors.transparent,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (_) => _DetailsSheet3D(item: it),
+      builder: (_) => QuickAddSheet(onPick: _handleQuickAdd),
     );
   }
 
-  Future<void> _addPickedAsteroid() async {
-    final picked = await pickAsteroid(context); // returns Asteroid from the search page
-    if (picked == null) return;
-
-    final neoLite = picked.toNeoLite(); // <-- map once
-
-    // Avoid duplicates fast
-    if (!_ids.add(neoLite.id)) {
-      // Already present — focus and toast instead of adding again
-      _focusId = neoLite.id;
-      _showCenterNotice('${neoLite.name} (redan tillagd)');
-      setState(() {}); // re-render to apply focus/notice
-      return;
-    }
-
-    try {
-      setState(() => _loading = true);
-
-      // OrbitElements cache (radian model)
-      final el = _cache[neoLite.id] ??
-          OrbitElements.fromNeo(await _neo.getNeoById(neoLite.id));
-      _cache[neoLite.id] = el;
-
-      // Choose color once; store in the hot path
-      final color = neoLite.isHazardous ? Colors.redAccent : Colors.cyanAccent;
-
-      _items.add(Orbit3DItem(neo: neoLite, el: el, color: color));
-
-// request selection + optional toast
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _canvasKey.currentState?.selectById(neoLite.id);
-      });
-      _showCenterNotice(neoLite.name);
-
-      setState(() => _loading = false);
-
-    } catch (e) {
-      // rollback ID set if fetch failed
-      _ids.remove(neoLite.id);
-      if (!mounted) return;
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Kunde inte lägga till: $e')),
-      );
+  Future<void> _handleQuickAdd(QuickAddAction a) async {
+    switch (a) {
+      case QuickAddAction.addRandom:
+        return _ctrl.addRandom();
+      case QuickAddAction.todayAll:
+        return _ctrl.addTodayAll();
+      case QuickAddAction.addAllHazardous:
+        return _ctrl.addAllHazardous(max: 100);
+      case QuickAddAction.addAllAsteroids:
+        return _ctrl.addAllKnown(max: 100);
     }
   }
 
+/*  Future<Asteroid?> pickAsteroid(BuildContext context) {
+    return showModalBottomSheet<Asteroid>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => const AsteroidSearchPage(pickMode: true),
+    );
+  }*/
+
+  Future<void> _addPickedAsteroid() async {
+    final picked = await pickAsteroid(context);
+    if (picked == null) return;
+
+    final neoLite = picked.toNeoLite();
+
+    if (!_ids.add(neoLite.id)) {
+      _focusId = neoLite.id;
+      _showCenterNotice('${neoLite.name} already added');
+      setState(() {});
+      return;
+    }
+    try {
+      setState(() => _loading = true);
+      final el = await _repo.getOrbit(neoLite.id);
+      final color = neoLite.isHazardous ? Colors.redAccent : Colors.cyanAccent;
+      _items.add(Orbit3DItem(neo: neoLite, el: el, color: color));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _canvasKey.currentState?.selectedId(neoLite.id);
+      });
+      _showCenterNotice(neoLite.name);
+    } catch (e) {
+      _ids.remove(neoLite.id);
+      _showCenterNotice(
+        'Could not add: $e',
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _reset3DOrbitViewer() {
+    _items.removeWhere((it) => it.neo != null);
+    _ids.clear();
+    _cache.clear();
+    _repo.clearCaches();
+    _elapsedDays = 0;
+    setState(() {});
+    _canvasKey.currentState?.resetSimulation();
+    _showCenterNotice('Restored');
+  }
+
+  // todo [ERROR:flutter/runtime/dart_vm_initializer.cc(40)] Unhandled Exception:
+/*
+  Future<void> _loadAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() => _appVersion = info.version);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _appVersion = null);
+    }
+  }
+*/
 
   @override
   Widget build(BuildContext context) {
+    final s = widget.controller.state;
     if (_loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -157,128 +212,69 @@ class _OrbitViewer3DPageState extends State<OrbitViewer3DPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        foregroundColor:  Theme.of(context).colorScheme.onSurface,
-        title: const Text(
-          'NEO 3D Orbits',
-          style: TextStyle(
-            fontFamily: 'EVA-Matisse_Standard',
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
+        appBar: AppBar(
+      //    backgroundColor: Colors.transparent,
+          //  backgroundColor: Theme.of(context).colorScheme.surface,
+            foregroundColor: Theme.of(context).colorScheme.onSurface,
+          title: const Text(
+            'NeoWS Orbit Viewer',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+            ),
           ),
         ),
-      ),
-      drawer: Drawer(
-        elevation: 100,
-       // shadowColor: Colors.black54,
-        child: Column(
-          children: [
-            DrawerHeader(
-              child: Image.asset(
-                "lib/assets/images/icon/icon1.png",
-                width: 100,
-                height: 100,
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.home),
-              title: const Text("Home"),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, "/orbit_viewer_3d_page");
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.search),
-              title: const Text("Sök Asteroider med NeoWs och Asterank"),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, "/asteroid_search");
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.newspaper),
-              title: const Text("News"),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, "/news");
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.info),
-              title: const Text("Acknowledgements"),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, "/acknowledgements_page");
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.settings),
-              title: const Text("Settings"),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, "/settings_page");
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.rocket),
-              title: const Text("Asteroid Sida"),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, "/asteroid_page");
-              },
-            ),
-          ],
+        drawer: SideMenu(
+          controller: widget.controller,
+        //  appVersion: _appVersion,
+          onGoHomePage: () {
+            Navigator.pop(context);
+            Navigator.pushNamed(context, "/orbit_viewer_3d_page");
+          },
+    /*      onGoSearch: () {
+            Navigator.pop(context);
+            Navigator.pushNamed(context, "/asteroid_search");
+          },*/
+          onGoCredits: () {
+            Navigator.pop(context);
+            Navigator.pushNamed(context, "/acknowledgements_page");
+          },
+     /*     onGoSettings: () {
+            Navigator.pop(context);
+            Navigator.pushNamed(context, "/settings_page");
+          },*/
         ),
-      ),
-      body: Stack(
-        children: [
+        body: Stack(children: [
           Positioned.fill(
             child: Orbit3DCanvas(
               key: _canvasKey,
               items: _items,
-           //   requestSelectId: _focusId,
-              onSelect: _openDetails3D,
-              onLongPressItem: (it) {
-                setState(() {
-                  _items.removeWhere((x) => x.neo.id == it.neo.id);
-                  _cache.remove(it.neo.id);
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Tog bort ${it.neo.name}')),
-                );
-              },
+              onSelect: (it) => setState(() => _selectedItem = it),
+              onTapBackground: () => setState(() => _selectedItem = null),
               simDaysPerSec: _speed,
               paused: _paused,
               planets: innerPlanets,
               showStars: true,
               starCount: 900,
-              // Axis + grid controls:
-              showAxes: true,
-              showGrid: true,
-              gridSpacingAu: 1,
-              // try 0.2 for denser
-              gridExtentAu: 30.0,
-              // increase to 5–10 to see more
+              invertY: s.invertY,
+              showAxes: s.showAxes,
+              showGrid: s.showGrid,
+              showOrbits: s.showOrbits,
+              rotateSensitivity: s.rotateSens,
+              zoomSensitivity: s.zoomSens,
+              minDistance: _minDist,
+              maxDistance: _maxDist,
+              gridSpacingAu: 1, // try 0.2 for denser
+              gridExtentAu: 30.0,  // increase to 5–10 to see more
               axisXColor: const Color(0xFFFF6B6B),
               axisYColor: const Color(0xFF6BFF8A),
               gridColor: const Color(0x33FFFFFF),
-              // inclination effect
               showShadowPinsAndNodes: true,
               orbitShadowOpacity: 0.38,
-              pinEveryN: 1,
+              pinEveryN: 2,
               pinAboveColor: const Color(0xFF4CAF50),
               pinBelowColor: const Color(0xFFE57373),
-              nodeAscColor: const Color(0xFF7CFC00),
-              nodeDescColor: const Color(0xFFFF6B6B),
-              nodeRipplePeriodMs: 2400,
-              nodeRippleMaxRadiusPx: 24,
-
-              resetTick: _resetTick,
-              // bump to reset sim
               onSimDaysChanged: (d) {
-                // report Δt up
                 if (mounted) setState(() => _elapsedDays = d);
               },
             ),
@@ -300,8 +296,7 @@ class _OrbitViewer3DPageState extends State<OrbitViewer3DPage> {
                             color: Theme.of(context).colorScheme.surface,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: Theme.of(context).colorScheme.onSurface
-                            ),
+                                color: Theme.of(context).colorScheme.onSurface),
                           ),
                           child: Text(
                             _centerNotice!,
@@ -312,178 +307,151 @@ class _OrbitViewer3DPageState extends State<OrbitViewer3DPage> {
             ),
           ),
 
-          // Controls overlay
           Positioned(
             left: 12,
             right: 12,
             bottom: 12,
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: (_selectedItem == null)
+                      ? const SizedBox.shrink()
+                      : OutlinedButton.icon(
+                          key: const ValueKey('spaceRefBtn'),
+                          onPressed: () {
+                            final item = _selectedItem!;
+                            final feedMap = neoLiteToFeedMap(item.neo);
+                            final asteroid = asteroidFromFeedItem(feedMap);
+                            final el = item.el;
+                            final double a = el.a;
+                            final double e = el.e;
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              enableDrag: false,
+                              useSafeArea: true,
+                              backgroundColor:
+                                  Theme.of(context).colorScheme.surface,
+                              builder: (_) => SpaceRefSheet(
+                                asteroidName: item.neo.name.isNotEmpty
+                                    ? item.neo.name
+                                    : item.neo.id,
+                                asteroid: asteroid,
+                                orbitA: a,
+                                orbitE: e,
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.auto_stories_outlined),
+                          label: const Text('SpaceReference (Experimental)'),
+                        ),
+                ),
+                if (_selectedItem != null) const SizedBox(height: 0),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                        onPressed: () => setState(() => _paused = !_paused),
-                        icon: Icon(_paused ? Icons.play_arrow : Icons.pause,
-                          color: Theme.of(context).colorScheme.onSurface,),
-                        tooltip: _paused ? 'Play' : 'Pause',
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _SpeedBtn(
+                              tooltip: 'Speed -20',
+                              icon: const Icon(Icons.fast_rewind),
+                              onTap: () => setState(() =>
+                                  _speed = (_speed - 20).clamp(0.0, 200))),
+                          _SpeedBtn(
+                              tooltip: 'Speed -1',
+                              icon: const Icon(Icons.skip_previous),
+                              onTap: () => setState(
+                                  () => _speed = (_speed - 1).clamp(0.0, 200))),
+                          Chip(
+                            label: Text(_simDateString()),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          _SpeedBtn(
+                              tooltip: 'Speed +1',
+                              icon: const Icon(Icons.skip_next),
+                              onTap: () => setState(
+                                  () => _speed = (_speed + 1).clamp(0.0, 200))),
+                          _SpeedBtn(
+                              tooltip: 'Speed +20',
+                              icon: const Icon(Icons.fast_forward),
+                              onTap: () => setState(() =>
+                                  _speed = (_speed + 20).clamp(0.0, 200))),
+                          IconButton(
+                            onPressed: () => setState(() => _paused = !_paused),
+                            icon: Icon(
+                              _paused ? Icons.play_arrow : Icons.pause,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                            tooltip: _paused ? 'Play' : 'Pause',
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: _loading ? null : _addPickedAsteroid,
+                            icon: const Icon(Icons.search),
+                            label: const Text('Add asteroid'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: _busy ? null : _openQuickAddSheet,
+                            icon: const Icon(Icons.add),
+                            label: Text(_busy ? 'Loading…' : 'Options'),
+                          ),
+                        ],
                       ),
-                      _SpeedBtn(
-                          label: '-20',
-                          onTap: () => setState(
-                              () => _speed = (_speed - 20).clamp(0, 200))),
-                      _SpeedBtn(
-                          label: '-1',
-                          onTap: () => setState(
-                              () => _speed = (_speed - 1).clamp(0, 200))),
-                      Chip(
-                        label: Text('${_speed.toStringAsFixed(0)} d/s'),
-                        backgroundColor: Theme.of(context).colorScheme.surface,
-                        visualDensity: VisualDensity.compact,
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: OverflowBar(
+                          alignment: MainAxisAlignment.center,
+                          children: [
+                            TextButton.icon(
+                                icon: const Icon(Icons.center_focus_strong),
+                                label: const Text('Re-center'),
+                                onPressed:
+                                    _canvasKey.currentState?.homeToSunSnap),
+                            TextButton.icon(
+                                icon: const Icon(Icons.replay_rounded),
+                                label: const Text('Reset'),
+                                onPressed: _reset3DOrbitViewer),
+                          ],
+                        ),
                       ),
-                      _SpeedBtn(
-                          label: '+1',
-                          onTap: () => setState(
-                              () => _speed = (_speed + 1).clamp(0, 200))),
-                      _SpeedBtn(
-                          label: '+20',
-                          onTap: () => setState(
-                              () => _speed = (_speed + 20).clamp(0, 200))),
-                      OutlinedButton.icon(
-                        onPressed: _loading ? null : _addPickedAsteroid,
-                        icon: const Icon(Icons.search),
-                        label: const Text('Lägg till asteroid'),
-                      ),
-                      // TODO Fixa restet days Snart
-                  /*    OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(0, 36)),
-                        onPressed: () => setState(() {
-                          _resetTick++;
-                          _elapsedDays = 0;
-                        }),
-                        icon: const Icon(Icons.restart_alt),
-                        label: const Text('Reset'),
-                      ),*/
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      'Δt: ${_elapsedDays.toStringAsFixed(1)} d',
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
+          )
+        ]));
   }
 }
 
 class _SpeedBtn extends StatelessWidget {
-  const _SpeedBtn({required this.label, required this.onTap});
+  const _SpeedBtn(
+      {required this.onTap,
+        required this.icon,
+        required this.tooltip});
 
-  final String label;
+  final Icon icon;
   final VoidCallback onTap;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
-      style: TextButton.styleFrom(
-        foregroundColor:  Theme.of(context).colorScheme.onSurface,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        minimumSize: const Size(0, 36),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        visualDensity: VisualDensity.compact,
-      ),
+    return IconButton(
       onPressed: onTap,
-      child: Text(label),
+      icon: icon,
+      tooltip: tooltip,
     );
-  }
-}
-
-class _DetailsSheet3D extends StatelessWidget {
-  const _DetailsSheet3D({required this.item});
-
-  final Orbit3DItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final n = item.neo;
-    final el = item.el; // TODO Need this?
-    final name = item.neo.name;
- // TODO fix net code:202
-    final jplUrl = Uri.parse(
-        'https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=${n.id}');
-    final mpcUrl = Uri.parse(
-        'https://minorplanetcenter.net/db_search/show_object?object_id=${Uri.encodeComponent(name)}');
-
-    String _slug(String s) => s
-        .replaceAll(RegExp(r'[()\[\],]'), '')
-        .trim()
-        .toLowerCase()
-        .replaceAll(RegExp(r'\s+'), '-');
-
-    final spaceRefUrl =
-        Uri.parse('https://www.spacereference.org/asteroid/${_slug(name)}');
-
-    void _openInApp(SourceTab initial) {
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        enableDrag: false,
-        // WebView owns vertical scroll
-        backgroundColor:Theme.of(context).colorScheme.onSurface,
-        builder: (_) => SpaceRefWebSheet(
-          title: name,
-          initialSource: initial,
-          // which one to show first
-          spaceRefUrl: spaceRefUrl,
-          jplUrl: jplUrl,
-          mpcUrl: mpcUrl,
-          siteSearchFallbackQuery: name, // SpaceRef slug fallback
-        ),
-      );
-    }
-
-    return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(
-          children: [
-            const SizedBox(width: 5),
-            // or ElevatedButton
-            OutlinedButton.icon(
-              onPressed: () => _openInApp(SourceTab.jpl),
-              icon: const Icon(Icons.science_outlined),
-              label: const Text('JPL'),
-            ),
-            const SizedBox(width: 5),
-            OutlinedButton.icon(
-              onPressed: () => _openInApp(SourceTab.spaceRef),
-              icon: const Icon(Icons.auto_stories_outlined),
-              label: const Text('SpaceReference'),
-            ),
-            const SizedBox(width: 5),
-            OutlinedButton.icon(
-              onPressed: () => _openInApp(SourceTab.mpc),
-              icon: const Icon(Icons.public),
-              label: const Text('MPC'),
-            ),
-          ],
-        ));
   }
 }
