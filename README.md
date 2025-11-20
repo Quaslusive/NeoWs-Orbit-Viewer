@@ -1,8 +1,9 @@
 ## Implementation and Feature Overview
 
 ### 3D Orbit Viewer
-
-<img src="lib/assets/screenshots/Screenshot_20251118_222742.png" alt="3D Orbit Viewer" width="200" />
+<p align="center">
+<img src="lib/assets/screenshots/Screenshot_20251118_222742.png" alt="3D Orbit Viewer" width="300"/>
+</p>
 
 ### Overview
 
@@ -67,8 +68,9 @@ The side menu also contains a **Credits** page, listing which APIs and services 
 ---
 
 ### Search Function
-
-<img src="lib/assets/screenshots/Screenshot_20251118_222859.png" alt="3D Orbit Viewer" width="200" />
+<p align="center">
+<img src="lib/assets/screenshots/Screenshot_20251118_222859.png" alt="3D Orbit Viewer" width="250" />
+  </p>
 On the search page (`asteroid_search_page.dart`) the user can:
 
 - Enter a name or designation (e.g. `Apophis`)  
@@ -86,8 +88,9 @@ If no asteroids are found, a clear message is shown instead of an empty screen.
 ---
 
 ### 3D Orbit Viewer
-
-<img src="lib/assets/screenshots/Screenshot_20251118_223112.png" alt="3D Orbit Viewer" width="200" />
+<p align="center">
+<img src="lib/assets/screenshots/Screenshot_20251118_223112.png" alt="3D Orbit Viewer" width="250" />
+  </p>
 A central part of the app is the 3D visualization (`orbit_viewer_3d_page.dart` and `orbit_3d_canvas.dart`). In this view:
 
 - The sun is drawn in the center  
@@ -112,8 +115,9 @@ The resulting positions are projected onto the 2D screen and rendered using a `C
 ---
 
 ### External Information Sources (WebView / SpaceReference)
-
-<img src="lib/assets/screenshots/Screenshot_20251118_223127.png" alt="3D Orbit Viewer" width="200" />
+<p align="center">
+<img src="lib/assets/screenshots/Screenshot_20251118_223127.png" alt="3D Orbit Viewer" width="250" />
+  </p>
 For some asteroids, the user can open an external information page (for example a matching page on **SpaceReference.org**) using `SpaceRefSheet`:
 
 - A `WebViewController` loads a URL based on the asteroid’s name or SPK-ID  
@@ -125,8 +129,9 @@ For some asteroids, the user can open an external information page (for example 
 ---
 
 ### Settings and Theme
-
-<img src="lib/assets/screenshots/Screenshot_20251118_223206.png" alt="3D Orbit Viewer" width="200" />
+<p align="center">
+<img src="lib/assets/screenshots/Screenshot_20251118_223206.png" alt="3D Orbit Viewer" width="250" />
+  </p>
 The app provides a simple but flexible settings system, accessible via the side menu (`SideMenu`). Settings are managed by:
 
 - `SettingsController`  
